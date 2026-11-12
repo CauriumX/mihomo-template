@@ -1,0 +1,142 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  template:
+    name: Template integrity
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # 结构断言：顶层键齐全，rules 引用的组和 provider 都已定义。
+      #
+      # 这一步只证明「键存在、引用能解析」，不能证明 mihomo 真的接受它 ——
+      # 非法枚举值（如需要新版内核的 fake-ip-filter-mode）、拼错的组名、
+      # provider 的 behavior 与文件格式矛盾，都只有内核自己能发现。
+      - name: Template structure
+        run: |
+          python3 - <<'PY'
+          import sys, yaml
+          d = yaml.safe_load(open('templates/mihomo.yaml'))
+          assert isinstance(d, dict), 'template is not a mapping'
+          for key in ('proxy-groups', 'rules', 'rule-providers'):
+              assert key in d, f'missing top-level key: {key}'
+
+          groups = {g['name'] for g in d['proxy-groups']}
+          builtin = {'DIRECT', 'REJECT', 'REJECT-DROP', 'PASS'}
+          provs = set(d['rule-providers'])
+          missing = set()
+
+          for r in d['rules']:
+              p = [x.strip() for x in r.split(',')]
+              t = p[0].upper()
+              if t == 'MATCH':
+                  if p[1] not in groups and p[1] not in builtin:
+                      missing.add(p[1])
+              elif t == 'RULE-SET':
+                  assert p[1] in provs, f'undefined provider: {p[1]}'
+                  if p[2] not in groups and p[2] not in builtin:
+                      missing.add(p[2])
+              elif t in ('AND', 'OR', 'NOT'):
+                  if p[-1] not in groups and p[-1] not in builtin:
+                      missing.add(p[-1])
+              else:
+                  pol = p[2] if len(p) > 2 else p[1]
+                  if pol not in groups and pol not in builtin:
+                      missing.add(pol)
+
+          assert not missing, f'undefined policy groups: {sorted(missing)}'
+          print(f'OK: {len(d["proxy-groups"])} groups, '
+                f'{len(d["rule-providers"])} providers, {len(d["rules"])} rules')
+          PY
+
+      # 版本契约：所有 rule-provider URL 必须用同一个 ref。
+      #
+      # 模板源里写的是 {{RULES_VERSION}} 占位符，发布时由 mihomo-apply
+      # 替换成具体 tag。如果某处漏改回 @main，模板锁了版本而规则集漂移，
+      # 回滚时两者不兼容 —— 这种错配不会有任何报错，只会静默失效。
+      - name: Version contract
+        run: |
+          python3 - <<'PY'
+          import re, sys
+
+          src = open('templates/mihomo.yaml', encoding='utf-8').read()
+          urls = [m.group(1) for m in re.finditer(r'url:\s*"([^"]+)"', src)
+                  if '/site/' in m.group(1) or '/geoip/' in m.group(1)]
+
+          if not urls:
+              sys.exit('no ruleset URLs found')
+
+          refs = {}
+          for u in urls:
+              m = re.search(r'@([^/]+)/', u)
+              ref = m.group(1) if m else 'NONE'
+              refs[ref] = refs.get(ref, 0) + 1
+
+          for ref, n in refs.items():
+              print(f'  @{ref}: {n} 处')
+
+          if len(refs) > 1:
+              sys.exit(f'ref 不一致: {list(refs)}')
+
+          only = list(refs)[0]
+          if only != '{{RULES_VERSION}}':
+              sys.exit(f'ref 应为 {{{{RULES_VERSION}}}}，实际 @{only}')
+
+          print(f'OK: {len(urls)} 个 URL 统一使用 {{{{RULES_VERSION}}}}')
+          PY
+
+      # 每个 provider 都必须指向 mihomo-apply，不能指向本仓库或第三方。
+      - name: Provider provenance
+        run: |
+          python3 - <<'PY'
+          import re, sys, yaml
+
+          d = yaml.safe_load(open('templates/mihomo.yaml'))
+          own = 'CauriumX/mihomo-apply'
+          bad = [(k, v['url']) for k, v in d['rule-providers'].items()
+                 if own not in v['url']]
+          if bad:
+              for k, u in bad:
+                  print(f'  {k}: {u}', file=sys.stderr)
+              sys.exit(f'all providers must point at {own}')
+          print(f'OK: all {len(d["rule-providers"])} providers point at {own}')
+          PY
+
+      # 用真实 mihomo 加载。渲染占位符后注入假节点，验证内核接受这份配置。
+      - name: Loads in real mihomo
+        run: |
+          set -euo pipefail
+          MIHOMO_VERSION=v1.19.33
+          curl -sSL -o /tmp/mihomo.gz \
+            "https://github.com/MetaCubeX/mihomo/releases/download/${MIHOMO_VERSION}/mihomo-linux-amd64-${MIHOMO_VERSION}.gz"
+          gunzip -f /tmp/mihomo.gz && chmod +x /tmp/mihomo
+          /tmp/mihomo -v
+
+          # 模板 proxies: [] 由订阅服务注入节点。这里渲染时补占位节点，
+          # 让 select 组能解析，再交给内核做真实校验。
+          node tools/render-check.mjs templates/mihomo.yaml --out /tmp/rendered.yaml
+          /tmp/mihomo -t -d /tmp -f /tmp/rendered.yaml
+
+      # 旧版内核兼容：v1.19.18 是 FilterRule 出现前的最后一个版本。
+      - name: Loads on mihomo v1.19.18
+        run: |
+          set -euo pipefail
+          MIHOMO_VERSION=v1.19.18
+          curl -sSL -o /tmp/mihomo-old.gz \
+            "https://github.com/MetaCubeX/mihomo/releases/download/${MIHOMO_VERSION}/mihomo-linux-amd64-${MIHOMO_VERSION}.gz"
+          gunzip -f /tmp/mihomo-old.gz && chmod +x /tmp/mihomo-old
+          /tmp/mihomo-old -v
+          /tmp/mihomo-old -t -d /tmp -f /tmp/rendered.yaml
+
+      - name: Unit tests
+        run: node --test tools/*.test.mjs
