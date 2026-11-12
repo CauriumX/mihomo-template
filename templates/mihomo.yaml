@@ -817,6 +817,22 @@ rule-providers:
 # ============================================================================
 
 rules:
+  # ---------------------------------------------------------------------------
+  # 订阅更新必须直连（放最前，先于一切 REJECT 与分流）
+  #
+  # 客户端拉订阅时，这个 HTTP 请求走本文件的路由规则。如果它命中 MATCH
+  # 走代理，而代理组里选中的节点已失效或为空，请求发不出去 —— 客户端
+  # 就永远拉不到新配置，形成死锁（TUN 模式下尤其明显）。
+  #
+  # 这三个域名覆盖：
+  #   cdn.jsdelivr.net   规则集与模板的实际分发（mihomo-apply@<tag>）
+  #   jsdelivr.net       同上，子域兜底
+  #   pages.dev          MiSub 部署域名（*.pages.dev）
+  # ---------------------------------------------------------------------------
+  - "DOMAIN-SUFFIX,cdn.jsdelivr.net,DIRECT"
+  - "DOMAIN-SUFFIX,jsdelivr.net,DIRECT"
+  - "DOMAIN-SUFFIX,pages.dev,DIRECT"
+
   - "RULE-SET,Local-IP,DIRECT,no-resolve"
   - "AND,((DST-PORT,443),(NETWORK,UDP)),REJECT"
   - "DST-PORT,25/587/465/143/993/110/995,DIRECT"
