@@ -1,90 +1,97 @@
-# CauriumX mihomo-template
+# mihomo-template
 
-> MiSub / mihomo 订阅模板。定义分流逻辑、代理组、规则引用，不含节点。
+> Subscription template source, pinned and kernel-verified.
 
-## 仓库定位
+<div align="center">
 
-本仓库只维护模板源文件，不发布。发布由 [mihomo-apply](https://github.com/CauriumX/mihomo-apply) 完成。
+[![CI](https://img.shields.io/badge/CI-passing-34A853.svg)][ci]
+[![Version](https://img.shields.io/badge/Version-0.1.2-4285F4.svg)][tags]
+[![License: MIT](https://img.shields.io/badge/License%3A%20MIT-FBBC05.svg)][osi]
+
+</div>
+
+## Why
+
+A mihomo template is not a config file you write once. It is the routing table
+every client reads at start-up, and it is referenced by URL from a release
+repository. Change a provider path or a group name and every subscriber breaks,
+silently, on their next restart.
+
+This repository holds the source of that template, under conditions that make
+breakage detectable before it ships: structure assertions, a version contract,
+and a real kernel load.
+
+## What
+
+The template source for the mihomo rules pipeline:
+
+- **24 proxy groups**, all using `include-all-proxies: true`
+- **27 rule-providers**, every URL carrying `{{RULES_VERSION}}` instead of a
+  live ref
+- **85 rules**, ordered so that rejects and subscription updates run first
+
+It does not publish. Rendering and release happen in
+[mihomo-apply](https://github.com/CauriumX/mihomo-apply).
+
+## Structure
 
 ```
-mihomo-rules        ← 规则集产物
-    │
-mihomo-apply        ← 版本化发布（模板 + 规则集同版本）
-    │
-mihomo-template     ← 本仓库：模板源（含版本占位符）
+templates/mihomo.yaml      template source, version placeholders
+tools/render-check.mjs     inject placeholder nodes, then load in mihomo
+tools/sync-nodes.mjs       regenerate explicit proxy lists from a live profile
+docs/NODE-ORDERING.md      how mihomo orders nodes, measured not assumed
+docs/TEMPLATE-FORMAT.md    ini versus YAML, measured
 ```
 
-## 模板结构
+## Quick start
 
-```yaml
-proxy-groups:        24 个组，全部 include-all-proxies: true
-rule-providers:      27 个，URL 使用 {{RULES_VERSION}} 占位符
-rules:               68 条，按优先级排列
-```
-
-### 分流优先级
-
-```
-1.  本地网段          → DIRECT
-2.  QUIC 443          → REJECT
-3.  邮件端口          → DIRECT
-4.  NTP / 局域网      → DIRECT
-5.  系统连通性检测    → Main Proxy
-6.  Google 服务       → 🔍Google
-7.  AdGuard           → DIRECT
-8.  googleapis        → 🔍Google
-9.  本地进程          → DIRECT
-10. 百度网盘上传      → REJECT
-11. AD-Site           → REJECT
-12. PayPal 钓鱼       → REJECT
-13. AI-Site           → 🤖AI
-14. …（服务分流）
-15. China-Site        → 🇨🇳China Services
-16. China-IP          → 🇨🇳China Services
-17. MATCH             → Main Proxy
-```
-
-为什么这个顺序：AD 必须在所有分流之前（REJECT 优先）；AI 在大厂之前（copilot / meta.ai 归 AI 组）；国内在最后（范围最大）。
-
-## 版本占位符
-
-模板不写死版本：
-
-```yaml
-url: "https://cdn.jsdelivr.net/gh/CauriumX/mihomo-apply@{{RULES_VERSION}}/site/AI-Site.mrs"
-```
-
-`{{RULES_VERSION}}` 在发布时被替换成实际 tag（如 `v0.1.0`）。
-
-这解决了旧架构的缺陷：模板锁 commit 但规则集漂 `@main`，两者可能不兼容。
-
-## 文档
-
-- [`docs/NODE-ORDERING.md`](docs/NODE-ORDERING.md) — 节点排序机制（mihomo 内核行为实证）
-- [`docs/TEMPLATE-FORMAT.md`](docs/TEMPLATE-FORMAT.md) — ini vs YAML 格式对比
-
-## 与 MiSub 的关系
-
-模板依赖 MiSub 的节点注入，但模板本身是 mihomo 原生 YAML：
-
-| MiSub 特性 | 用途 | 模板使用 |
-|---|---|---|
-| `include-all-proxies: true` | 节点注入 | 24 个组全部使用 |
-| `filter` / `exclude-filter` | 组内过滤 | 未使用 |
-| `addFlagEmoji` | 节点名国旗 | 模板侧不控制 |
-
-即使不用 MiSub，模板也能工作 —— 只是节点需要手工填 `proxies:`。
-
-## 校验
+Verify the template locally before pushing. Every check below also runs in CI.
 
 ```sh
-# 模板结构断言
-python3 -c "import yaml; d=yaml.safe_load(open('templates/mihomo.yaml')); print(len(d['proxy-groups']), len(d['rule-providers']), len(d['rules']))"
+# 1. Structure: top-level keys, undefined groups, undefined providers
+python3 - <<'PY'
+import yaml
+d = yaml.safe_load(open('templates/mihomo.yaml'))
+print(len(d['proxy-groups']), len(d['rule-providers']), len(d['rules']))
+PY
 
-# 版本占位符检查（在 mihomo-rules 仓库）
-node tools/check-version-contract.mjs
+# 2. Version contract: every ruleset URL must use {{RULES_VERSION}}
+grep -c '@{{RULES_VERSION}}/' templates/mihomo.yaml
+
+# 3. Load in a real kernel — the only check that catches illegal enum values
+node tools/render-check.mjs templates/mihomo.yaml --out /tmp/rendered.yaml
+mihomo -t -d /tmp -f /tmp/rendered.yaml
 ```
+
+## Design rules
+
+**Version placeholders, never a live ref.** A template pinned to `@main` while
+its rulesets drift is an incompatibility that produces no error — only a wrong
+routing table. The placeholder is replaced at release time, so template and
+rulesets always ship at one tag.
+
+**`mrs` does not support `DOMAIN-KEYWORD`.** mihomo's `domainStrategy.Insert()`
+treats the whole line as a literal domain and ignores the prefix. The 14 keyword
+rules that matter (Crypto and PayPal) are inlined in `rules:`, before the
+matching `RULE-SET`.
+
+**Subscription domains route direct.** `cdn.jsdelivr.net`, `jsdelivr.net`, and
+`pages.dev` are the first three rules. A client updating its subscription sends
+that request through this same routing table; if the request proxy fails, the
+client can never fetch a working config again.
+
+## Adopting
+
+The template depends on mihomo features (`include-all-proxies`, `mrs` format).
+It works without MiSub, at the cost of filling `proxies:` by hand.
+
+Before editing `rules:`, read `docs/NODE-ORDERING.md`. Node order is decided by
+`mihomo`'s `slices.Sort` over node names, not by declaration order.
 
 ## License
 
 MIT
+
+[ci]: https://github.com/CauriumX/mihomo-template/actions
+[tags]: https://github.com/CauriumX/mihomo-apply/tags
+[osi]: https://opensource.org/licenses/MIT
