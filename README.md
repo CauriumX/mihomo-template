@@ -1,6 +1,13 @@
-# mihomo-template
+<div align="center">
 
-> Subscription template source, pinned and kernel-verified.
+<a href="https://github.com/CauriumX/mihomo-template">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/hero-dark.svg">
+    <img alt="mihomo-template" src="assets/hero-light.svg" width="1640">
+  </picture>
+</a>
+
+</div>
 
 <div align="center">
 
@@ -10,6 +17,26 @@
 
 </div>
 
+<h1 align="center">mihomo-template</h1>
+
+<div align="center">
+
+> Subscription template source, pinned and kernel-verified.
+
+</div>
+
+> [!NOTE]
+> Every check in this repository runs against a real mihomo binary, not a schema.
+> A YAML linter accepts an illegal enum value; the kernel does not.
+
+<div align="center">
+
+English | [简体中文](README.zh-CN.md)
+
+</div>
+
+---
+
 ## Why
 
 A mihomo template is not a config file you write once. It is the routing table
@@ -18,16 +45,14 @@ repository. Change a provider path or a group name and every subscriber breaks,
 silently, on their next restart.
 
 This repository holds the source of that template, under conditions that make
-breakage detectable before it ships: structure assertions, a version contract,
-and a real kernel load.
+breakage detectable before it ships.
 
 ## What
 
 The template source for the mihomo rules pipeline:
 
 - **24 proxy groups**, all using `include-all-proxies: true`
-- **27 rule-providers**, every URL carrying `{{RULES_VERSION}}` instead of a
-  live ref
+- **27 rule-providers**, every URL carrying `{{RULES_VERSION}}` instead of a live ref
 - **85 rules**, ordered so that rejects and subscription updates run first
 
 It does not publish. Rendering and release happen in
@@ -45,15 +70,11 @@ docs/TEMPLATE-FORMAT.md    ini versus YAML, measured
 
 ## Quick start
 
-Verify the template locally before pushing. Every check below also runs in CI.
+Verify locally before pushing. Every command below also runs in CI.
 
 ```sh
 # 1. Structure: top-level keys, undefined groups, undefined providers
-python3 - <<'PY'
-import yaml
-d = yaml.safe_load(open('templates/mihomo.yaml'))
-print(len(d['proxy-groups']), len(d['rule-providers']), len(d['rules']))
-PY
+python3 -c "import yaml; d=yaml.safe_load(open('templates/mihomo.yaml')); print(len(d['proxy-groups']), len(d['rule-providers']), len(d['rules']))"
 
 # 2. Version contract: every ruleset URL must use {{RULES_VERSION}}
 grep -c '@{{RULES_VERSION}}/' templates/mihomo.yaml
@@ -80,17 +101,27 @@ matching `RULE-SET`.
 that request through this same routing table; if the request proxy fails, the
 client can never fetch a working config again.
 
+**Node order is decided by the kernel, not by declaration.** mihomo sorts by
+node name. Names must therefore be sortable without a flag emoji prefix —
+`A100-US-...` orders correctly, `🇺🇸A100-...` does not.
+
 ## Adopting
 
 The template depends on mihomo features (`include-all-proxies`, `mrs` format).
 It works without MiSub, at the cost of filling `proxies:` by hand.
 
-Before editing `rules:`, read `docs/NODE-ORDERING.md`. Node order is decided by
-`mihomo`'s `slices.Sort` over node names, not by declaration order.
+Before editing `rules:`, read `docs/NODE-ORDERING.md`. The ordering is measured
+against the kernel, not inferred from the config.
+
+## Feedback
+
+Issues and PRs are welcome. For a routing mistake, include the domain and the
+group it landed in. For an ordering complaint, include the full proxy list as
+the client shows it — the cause is usually a name that does not sort as expected.
 
 ## License
 
-MIT
+MIT © CauriumX
 
 [ci]: https://github.com/CauriumX/mihomo-template/actions
 [tags]: https://github.com/CauriumX/mihomo-apply/tags

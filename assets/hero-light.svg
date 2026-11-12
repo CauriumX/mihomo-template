@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1640 440" preserveAspectRatio="xMidYMid meet" role="img" aria-label="mihomo template — The routing table every client reads at start-up.">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#eef2ff"/>
+      <stop offset="0.5" stop-color="#faf5ff"/>
+      <stop offset="1" stop-color="#f4fbf9"/>
+    </linearGradient>
+    <radialGradient id="warm" cx="0.15" cy="0.2" r="0.7">
+      <stop offset="0" stop-color="#4F46E5" stop-opacity="0.16"/>
+      <stop offset="1" stop-color="#4F46E5" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="cool" cx="0.95" cy="0.85" r="0.6">
+      <stop offset="0" stop-color="#7C3AED" stop-opacity="0.22"/>
+      <stop offset="1" stop-color="#7C3AED" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="violet" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#7C3AED"/>
+      <stop offset="0.5" stop-color="#4F46E5"/>
+      <stop offset="1" stop-color="#7C3AED"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#4F46E5"/>
+      <stop offset="1" stop-color="#7C3AED"/>
+    </linearGradient>
+    <pattern id="grid" x="0" y="0" width="44" height="44" patternUnits="userSpaceOnUse">
+      <path d="M44 0 L0 0 0 44" fill="none" stroke="#0f172a" stroke-opacity="0.06" stroke-width="1"/>
+    </pattern>
+  </defs>
+
+  <rect width="1640" height="440" fill="url(#bg)"/>
+  <rect width="1640" height="440" fill="url(#warm)"/>
+  <rect width="1640" height="440" fill="url(#cool)"/>
+  <rect width="1640" height="440" fill="url(#grid)"/>
+
+  <rect x="100" y="118" width="180" height="3" rx="1.5" fill="url(#accent)" opacity="0.95"/>
+
+  <text x="100" y="102" font-family="'Inter','SF Pro Text','Avenir Next',-apple-system,Segoe UI,sans-serif" font-size="17" font-weight="600" letter-spacing="2.6" fill="#475569">SUBSCRIPTION TEMPLATE • PINNED • INLINED • KERNEL-VERIFIED</text>
+
+  <text x="100" y="232" font-family="'Iowan Old Style',Palatino,Georgia,'Times New Roman',serif" font-size="112" font-weight="700" fill="#0f172a" letter-spacing="-2">mihomo<tspan fill="url(#violet)"> template</tspan></text>
+
+  <text x="100" y="300" font-family="'Iowan Old Style',Palatino,Georgia,'Times New Roman',serif" font-size="29" font-style="italic" fill="#475569">The routing table every client reads at start-up.</text>
+  <text x="100" y="338" font-family="'Iowan Old Style',Palatino,Georgia,'Times New Roman',serif" font-size="29" font-style="italic" fill="#475569">24 groups, 85 rules, no live ref to drift under you.</text>
+
+  <g transform="translate(1140 110)">
+    <rect x="0" y="18" width="300" height="22" rx="4" fill="#4F46E5" fill-opacity="0.10"/><rect x="0" y="52" width="300" height="22" rx="4" fill="#4F46E5" fill-opacity="0.12"/><rect x="0" y="86" width="300" height="22" rx="4" fill="#4F46E5" fill-opacity="0.14"/><rect x="0" y="120" width="300" height="22" rx="4" fill="#4F46E5" fill-opacity="0.16"/><rect x="0" y="154" width="300" height="22" rx="4" fill="#4F46E5" fill-opacity="0.18"/><rect x="0" y="188" width="300" height="22" rx="4" fill="#4F46E5" fill-opacity="0.20"/>
+    <rect x="12" y="24" width="110" height="10" rx="5" fill="#4F46E5" fill-opacity="0.55"/><rect x="12" y="58" width="128" height="10" rx="5" fill="#4F46E5" fill-opacity="0.55"/><rect x="12" y="92" width="146" height="10" rx="5" fill="#4F46E5" fill-opacity="0.55"/><rect x="12" y="126" width="164" height="10" rx="5" fill="#4F46E5" fill-opacity="0.55"/><rect x="12" y="160" width="182" height="10" rx="5" fill="#4F46E5" fill-opacity="0.55"/><rect x="12" y="194" width="200" height="10" rx="5" fill="#4F46E5" fill-opacity="0.55"/>
+  </g>
+</svg>
