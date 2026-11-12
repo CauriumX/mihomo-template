@@ -1,0 +1,893 @@
+# ============================================================================
+# mihomo.yaml — MiSub Clash YAML Profile 模板
+#
+# 完整保留 dns / sniffer / ntp / tun 全部设置，仅做必要改动：
+#   1. 新增 proxies: []            —— MiSub 注入节点
+#   2. 新增 proxy-groups:          —— 补全 24 个策略组
+#   3. tun.device: DsotM-Tunnel
+#   4. 新增 💰Crypto / 💳PayPal 组
+#   5. 内联 15 条 PayPal 钓鱼域名拦截
+#
+# ============================================================================
+# 规则集来源
+# ============================================================================
+#   全部规则集均镜像到本仓库，不依赖任何第三方域名存活。
+#
+#   域名类（19 个）→ ruleset/site/*.mrs
+#     AD / Adobe / AI / Apple / Bahamut / Bilibili / China / Discord /
+#     Disney / Google / Meta / Microsoft / Netflix / Pixiv / Reddit /
+#     Steam / Telegram / Twitch / Twitter
+#
+#   IP 类（3 个）→ ruleset/geoip/*.mrs
+#     Local-IP / China-IP / Telegram-IP
+#     必须放 geoip/ 子目录：MiSub 靠路径里的 /geoip/ 判定 ipcidr，
+#     否则误判 domain 导致运行期 ErrInvalidFormat。
+#
+#   自建筛选（2 个 provider + 15 条内联）
+#     Crypto    → ruleset/Crypto.txt（212 条）
+#                 上游 Crypto 混入完整 PayPal 规则集（205/417 条，占 49%），
+#                 已用集合差剔除，避免访问 paypal.com 命中 Crypto 组。
+#     PayPal    → ruleset/PayPal.txt（191 条官方域名）
+#                 与 Crypto 无交集（已校验）。
+#     PayPal 钓鱼 → 内联到 rules: 段（15 条 DOMAIN-SUFFIX,xxx,REJECT）
+#                 判定依据：DNS MX 证据
+#                   官方域名 MX 指向 mx1.paypalcorp.com
+#                   仿冒域名无 MX 或 MX 指向品牌保护商
+#                 已校验：不含 paypal.com 等任何官方域名。
+#
+#   仓库：https://github.com/CauriumX/mihomo-template
+#   产物由 build-rules.sh 生成并入库，供 jsDelivr 引用。
+#   更新后需 purge jsDelivr 缓存（见 README 快速开始）。
+#
+# ============================================================================
+# 使用者分布：主要在中国大陆
+#   → 所有 rule-providers 保持 proxy: DIRECT
+#   → 规则集走 jsDelivr（中国大陆有 CF 节点）
+# ============================================================================
+#
+# 用法：
+#   MiSub 后台 → 订阅组 → 外部模板 → 填本文件的 GitHub Raw 链接
+#   https://raw.githubusercontent.com/<用户名>/<仓库>/main/templates/mihomo.yaml
+#
+# ⚠️ 必须用「远程模板 URL」且扩展名 .yaml
+#    MiSub processor-service.js:38
+#      if (templateSource?.kind === 'custom') return true;   // 自定义模板强制走 ini
+#      return getTemplateExtension(templateSource?.value) === 'ini';
+#    用「自定义规则模板」粘贴会被当 ini 解析，本文件全部内容会被丢弃。
+#
+# ⚠️ 会被 MiSub 强制覆盖的 4 个字段（Cloudflare 安全策略）：
+#      allow-lan: false
+#      bind-address: 127.0.0.1
+#      ipv6: false
+#      external-controller: 127.0.0.1:9090
+#    如需 bind-address: "*" 供局域网使用，生成订阅后本地手动改。
+#
+# ============================================================================
+# 节点排序（重要）
+# ============================================================================
+#   本模板 proxies: [] 由 MiSub 注入。节点在客户端的最终顺序取决于组的
+#   注入方式（两种机制完全不同，详见 docs/NODE-ORDERING.md）：
+#
+#     显式列名（proxies: [节点名...]）
+#       → 走 getProxies()（parser.go:134），按列表顺序输出，不排序
+#       → 顺序完全可控，但节点增删需同步改模板
+#
+#     include-all-proxies: true（本模板当前使用）
+#       → mihomo 用 slices.Sort(AllProxies) 按**节点名字节序**重排
+#         （config/config.go:892），与 proxies: 段声明顺序无关
+#       → 排序确定且可复现，不是「map 乱序」
+#       → 因此节点名必须可排序：无国旗 emoji、机型在前
+#         否则会按 emoji 码位分组（🇦🇺E500 会排第一）
+#
+#   默认顺序（MiSub subscription-service.js:930）：
+#     手动节点（按 profile.manualNodes 数组顺序）
+#     + 各订阅节点（按订阅列表顺序，订阅内部由机场决定）
+#
+#   如需排序，在 MiSub 后台配置「操作符链」（顺序必须 rename → sort → dedup，
+#   dedup 在 sort 之前会打乱结果）：
+#     订阅组 → 编辑 → 核心配置 → 操作符链 → 添加算子 → 节点排序
+#
+#   ── 可用排序键 ──
+#     name      节点名（localeCompare，numeric:true，sensitivity:base）
+#     region    地区（需节点名可识别，内置顺序：香港→台湾→日本→新加坡→
+#               美国→韩国→英国→德国→法国→加拿大）
+#     protocol  协议（vless→trojan→vmess→hysteria2→ss→ssr→anytls）
+#     port      端口
+#     server    服务器地址（IPv4 按数字排序）
+#     group     分组名
+#
+#   ── 配置示例（JSON，粘贴到操作符链） ──
+#   按节点名排序：
+#     { "type": "sort", "params": { "keys": [
+#         { "key": "name", "order": "asc" } ] } }
+#
+#   按地区排序（自定义优先级）：
+#     { "type": "sort", "params": { "keys": [
+#         { "key": "region", "order": "asc",
+#           "customOrder": ["美国","德国","日本","香港","新加坡","澳洲"] } ] } }
+#
+#   多键组合（先地区后名称）：
+#     { "type": "sort", "params": { "keys": [
+#         { "key": "region", "order": "asc" },
+#         { "key": "name", "order": "asc" } ] } }
+#
+#   ── 命名与排序的关系（实测结论） ──
+#   name 排序是纯字符串比较，从左到右逐字符比：
+#
+#     国旗-国家-序号-代码-节点号        → 排序结果
+#     🇩🇪DE-300-NCG-01                → AU 在最前（A < D < E < H < U）
+#     🇺🇸US-100-PRO-01                   国家代码字母序，数字不参与主排序
+#     🇦🇺AU-500-AWS-01
+#
+#   若要让数字（100/200/300）成为主排序键，必须把数字前置：
+#
+#     🇺🇸100-US-PRO-01                → 100 → 200 → 300 → 400 → 500 → 600
+#     🇩🇪300-DE-NCG-01                   数字优先，国家代码作次键
+#     🇦🇺500-AU-AWS-01
+#
+#   两种风格都保留全部信息，区别只在排序表现：
+#     国家在前 → 按地区聚类（AU/DE/ES/HK/US 字母序）
+#     数字在前 → 按序号聚类（100/200/300 数字序）
+#
+#   注：Shadowrocket 自带数字优先解析，Mihomo 没有，只能靠命名绕过。
+#
+#   若不用 sort 算子，节点保持 MiSub 的原始拼接顺序（手动节点在前）。
+# ============================================================================
+
+port: 7890
+socks-port: 7891
+mixed-port: 7892
+allow-lan: false
+bind-address: "*"
+mode: rule
+log-level: error
+ipv6: false
+find-process-mode: strict
+external-controller: 127.0.0.1:9090
+profile:
+  store-selected: true
+  store-fake-ip: true
+unified-delay: true
+tcp-concurrent: true
+global-ua: clash.meta
+
+sniffer:
+  enable: true
+  force-dns-mapping: true
+  parse-pure-ip: true
+  override-destination: true
+  sniff:
+    HTTP:
+      ports: [80, 8080-8880]
+      override-destination: true
+    TLS:
+      ports: [443, 8443]
+    QUIC:
+      ports: [443, 8443]
+  skip-domain:
+    - 'Mijia Cloud'
+    - '+.msftconnecttest.com'
+    - '+.msftncsi.com'
+    - '+.xboxservices.com'
+    - '+.xboxlive.com'
+    - '+.gamepass.com'
+
+ntp:
+  enable: true
+  write-to-system: false
+  server: ntp.aliyun.com
+  port: 123
+  interval: 30
+
+dns:
+  enable: true
+  prefer-h3: false
+  listen: 0.0.0.0:5350
+  ipv6: false
+  enhanced-mode: fake-ip
+  fake-ip-range: "198.18.0.1/16"
+  # fake-ip-filter-mode 取值（mihomo constant/dns.go FilterModeMapping）：
+  #   blacklist（默认）— 列表是「跳过 fake-ip 的黑名单」
+  #   whitelist        — 列表是白名单
+  #   rule             — 列表按规则集处理，支持 MATCH 兜底
+  #                      ⚠️ 仅 mihomo >= v1.19.19 支持
+  #
+  # 本模板用 blacklist（兼容性优先）：
+  #   v1.19.18 及更早的 FilterModeMapping 只有 blacklist / whitelist 两个值，
+  #   写 rule 会直接报 `invalid mode` 导致配置加载失败。FilterRule 在
+  #   v1.19.19 才引入（v1.19.18 无，v1.19.19 有）。
+  #
+  #   blacklist 语义：列表内域名走 real-ip，其余走 fake-ip。
+  #   下方 28 条 real-ip 规则效果不变；末尾的 MATCH 兜底条已删除
+  #   —— blacklist 模式下它无效且会误导读者。
+  #
+  #   若确认所有客户端 >= v1.19.19，可改回 rule 并恢复 MATCH,fake-ip 兜底。
+  fake-ip-filter-mode: blacklist
+  fake-ip-filter:
+    - "DOMAIN-SUFFIX,lan,real-ip"
+    - "DOMAIN-SUFFIX,local,real-ip"
+    - "DOMAIN,localhost.ptlogin2.qq.com,real-ip"
+    - "DOMAIN-SUFFIX,msftconnecttest.com,real-ip"
+    - "DOMAIN-SUFFIX,msftncsi.com,real-ip"
+    - "DOMAIN-SUFFIX,xboxservices.com,real-ip"
+    - "DOMAIN-SUFFIX,xboxlive.com,real-ip"
+    - "DOMAIN-SUFFIX,gamepass.com,real-ip"
+    - "DOMAIN,alt1-mtalk.google.com,real-ip"
+    - "DOMAIN,alt2-mtalk.google.com,real-ip"
+    - "DOMAIN,alt3-mtalk.google.com,real-ip"
+    - "DOMAIN,alt4-mtalk.google.com,real-ip"
+    - "DOMAIN,alt5-mtalk.google.com,real-ip"
+    - "DOMAIN,alt6-mtalk.google.com,real-ip"
+    - "DOMAIN,alt7-mtalk.google.com,real-ip"
+    - "DOMAIN,alt8-mtalk.google.com,real-ip"
+    - "DOMAIN,mtalk.google.com,real-ip"
+    - "DOMAIN,local.adguard.org,real-ip"
+    - "DOMAIN,injections.adguard.org,real-ip"
+    - "DOMAIN-SUFFIX,8uri.cn,real-ip"
+    - "DOMAIN-SUFFIX,kanimg.com,real-ip"
+    - "DOMAIN-SUFFIX,sandai.net,real-ip"
+    - "DOMAIN-SUFFIX,thunderurl.com,real-ip"
+    - "DOMAIN-SUFFIX,xunlei.com,real-ip"
+    - "DOMAIN-SUFFIX,00cdn.com,real-ip"
+    - "DOMAIN-SUFFIX,88cdn.com,real-ip"
+    - "DOMAIN-SUFFIX,p2cdn.com,real-ip"
+    - "DOMAIN-SUFFIX,thundercdn.com,real-ip"
+  use-hosts: true
+  default-nameserver:
+    - "114.114.114.114#DIRECT"
+    - "223.5.5.5#DIRECT"
+    - "119.29.29.29#DIRECT"
+    - "180.76.76.76#DIRECT"
+  proxy-server-nameserver:
+    - "https://dns.alidns.com/dns-query#DIRECT"
+    - "https://doh.pub/dns-query#DIRECT"
+    - "https://doh.onedns.net/dns-query#DIRECT"
+  nameserver:
+    - "https://cloudflare-dns.com/dns-query#🌏️Main Proxy&disable-ipv6=true"
+  direct-nameserver:
+    - "https://dns.alidns.com/dns-query#DIRECT&disable-ipv6=true"
+  direct-nameserver-follow-policy: true
+  nameserver-policy:
+    "ntp.aliyun.com": "https://dns.alidns.com/dns-query#DIRECT&disable-ipv6=true"
+    "+.lan": "https://dns.alidns.com/dns-query#DIRECT&disable-ipv6=true"
+    "+.local": "https://dns.alidns.com/dns-query#DIRECT&disable-ipv6=true"
+    "localhost.ptlogin2.qq.com": "https://dns.alidns.com/dns-query#DIRECT&disable-ipv6=true"
+    "+.msftconnecttest.com": "https://doh.pub/dns-query#🌏️Main Proxy&disable-ipv6=true"
+    "+.msftncsi.com": "https://doh.pub/dns-query#🌏️Main Proxy&disable-ipv6=true"
+    "+.xboxservices.com": "https://doh.pub/dns-query#💻Microsoft&disable-ipv6=true"
+    "+.xboxlive.com": "https://doh.pub/dns-query#💻Microsoft&disable-ipv6=true"
+    "+.gamepass.com": "https://doh.pub/dns-query#💻Microsoft&disable-ipv6=true"
+    "alt1-mtalk.google.com": "https://cloudflare-dns.com/dns-query#🔍Google&disable-ipv6=true"
+    "alt2-mtalk.google.com": "https://cloudflare-dns.com/dns-query#🔍Google&disable-ipv6=true"
+    "alt3-mtalk.google.com": "https://cloudflare-dns.com/dns-query#🔍Google&disable-ipv6=true"
+    "alt4-mtalk.google.com": "https://cloudflare-dns.com/dns-query#🔍Google&disable-ipv6=true"
+    "alt5-mtalk.google.com": "https://cloudflare-dns.com/dns-query#🔍Google&disable-ipv6=true"
+    "alt6-mtalk.google.com": "https://cloudflare-dns.com/dns-query#🔍Google&disable-ipv6=true"
+    "alt7-mtalk.google.com": "https://cloudflare-dns.com/dns-query#🔍Google&disable-ipv6=true"
+    "alt8-mtalk.google.com": "https://cloudflare-dns.com/dns-query#🔍Google&disable-ipv6=true"
+    "mtalk.google.com": "https://cloudflare-dns.com/dns-query#🔍Google&disable-ipv6=true"
+    "local.adguard.org": "system"
+    "injections.adguard.org": "system"
+    "+.8uri.cn": "system"
+    "+.kanimg.com": "system"
+    "+.sandai.net": "system"
+    "+.thunderurl.com": "system"
+    "+.xunlei.com": "system"
+    "+.00cdn.com": "system"
+    "+.88cdn.com": "system"
+    "+.p2cdn.com": "system"
+    "+.thundercdn.com": "system"
+
+tun:
+  enable: true
+  stack: system
+  auto-route: true
+  auto-detect-interface: true
+  strict-route: true
+  dns-hijack:
+    - any:53
+  device: DsotM-Tunnel
+  mtu: 1500
+  endpoint-independent-nat: true
+  route-exclude-address:
+    - "10.0.0.0/8"
+    - "100.64.0.0/10"
+    - "172.16.0.0/12"
+    - "192.168.0.0/16"
+    - "fc00::/7"
+    - "fe80::/10"
+    - "94.140.14.247/32"
+
+# ============================================================================
+# 节点占位 —— MiSub 渲染时整体替换
+# ============================================================================
+proxies: []
+
+# ============================================================================
+# 节点组 —— 服务商原配置未包含此段，此处补全
+#
+# 组名与下方 rules / dns 中引用的名称逐字一致（已校验）
+# 节点注入方式：include-all-proxies: true（全局统一）
+#   早期版本在 21 个 select 组内显式列出全部节点名。问题：
+#   各 profile 的节点集合不同（有的只有 A100，有的全量），
+#   模板硬编码全系列节点名时，缺某系列的 profile 会报
+#   「proxy group xxx: <节点名> not found」，整个订阅加载失败。
+#   现所有组统一用 include-all-proxies: true，由 mihomo 按该 profile
+#   实际拥有的节点自动展开，任何节点增减都无需改模板。
+#
+#   代价：节点顺序改由 mihomo `slices.Sort(AllProxies)` 决定 ——
+#         即按**节点名字节序**（UTF-8 码位）重排，与 proxies: 段的声明顺序无关。
+#         注意：这不是「map 乱序」，排序是确定且可复现的。
+#         因此节点名本身必须可排序（无国旗 emoji、机型在前），
+#         否则会按 emoji 码位分组（如 🇦🇺E500 排第一）。
+#         详见 docs/NODE-ORDERING.md。
+#   各组的固定项（Main Proxy / Auto Select / Load Balance / DIRECT / REJECT）仍显式保留。
+# ============================================================================
+proxy-groups:
+  # ==========================================================================
+  # 组结构对齐服务商规范：
+  #   总出口组：♾️Auto Select → ⚖Load Balance → DIRECT → REJECT
+  #   服务组：每个组前置 Main Proxy / Auto Select / Load Balance
+  #   健康检查：https://cp.cloudflare.com，interval 180
+  #
+  # 与服务的差异：节点显式列名时走 getProxies()（parser.go:134），
+  # 按列表顺序输出，不经过 slices.Sort，顺序完全可控。
+  # 代价是节点变更需同步本文件；用 tools/sync-nodes.mjs 从订阅自动刷新。
+  #
+  # 排列约定（仅影响本文件可读性，不影响路由）：
+  #   - 置顶：Main Proxy / Manual Select / China Services（总出口、手动固定与国内分流）
+  #   - 中间：服务组按名称字母序（Adobe → AI → Apple → … → Twitter）
+  #   - 末尾：⚖Load Balance / ♾️Auto Select（被所有服务组引用，放末尾便于阅读）
+  #
+  # 注意：mihomo config/utils.go:23 的 proxyGroupsDagSort 会在加载时做拓扑
+  # 排序，客户端实际显示的组顺序由 DAG 决定，与本文件书写顺序无关。
+  # 路由行为只由下方 rules: 段的匹配顺序决定，与组排列无关。
+  # ==========================================================================
+
+  # Main Proxy 的 proxies[0] 是 select 组刷新后的回落目标（mihomo 默认选中首项）。
+  # 置首为 ✋Manual Select 而非 ♾️Auto Select，原因：
+  #   profile.store-selected 的持久化 key 是「组名 → 节点名」字符串。
+  #   节点名一变（如国旗开关、flagEmojiSeparator 改动、机场改命名），
+  #   key 失效，组回落到 proxies[0]。
+  #   若首项是 ♾️Auto Select，回落即变成自动测速 → IP 乱跳。
+  #   置首为 ✋Manual Select 后，回落只落到手动组，再由手动组自身的
+  #   store-selected 决定，不会主动切到测速组。
+  # 实测（mihomo v1.19.2）：节点集增减不影响选中；节点改名会回落。
+  - name: 🌏️Main Proxy
+    type: select
+    include-all-proxies: true
+    proxies:
+      - "✋Manual Select"
+      - "♾️Auto Select"
+      - "⚖Load Balance"
+      - "DIRECT"
+      - "REJECT"
+
+  # 手动固定节点：在此组内选定某个节点后长期运行，不随订阅刷新跳 IP。
+  # include-all-proxies 展开后首项即第一个节点（非测速组），
+  # 因此即使本组自身回落，也只会落到具体节点而非 Auto Select。
+  - name: ✋Manual Select
+    type: select
+    include-all-proxies: true
+
+  - name: 🇨🇳China Services
+    type: select
+    include-all-proxies: true
+    proxies:
+      - "DIRECT"
+      - "🌏️Main Proxy"
+      - "♾️Auto Select"
+      - "⚖Load Balance"
+      - "REJECT"
+
+  - name: 💡Adobe
+    type: select
+    include-all-proxies: true
+    proxies:
+      - "🌏️Main Proxy"
+      - "♾️Auto Select"
+      - "⚖Load Balance"
+      - "DIRECT"
+      - "REJECT"
+
+  - name: 🤖AI
+    type: select
+    include-all-proxies: true
+    proxies:
+      - "🌏️Main Proxy"
+      - "♾️Auto Select"
+      - "⚖Load Balance"
+      - "REJECT"
+
+  - name: 🍎Apple
+    type: select
+    include-all-proxies: true
+    proxies:
+      - "🌏️Main Proxy"
+      - "♾️Auto Select"
+      - "⚖Load Balance"
+      - "DIRECT"
+      - "REJECT"
+
+  - name: 🌸Bahamut
+    type: select
+    include-all-proxies: true
+    proxies:
+      - "🌏️Main Proxy"
+      - "♾️Auto Select"
+      - "⚖Load Balance"
+      - "REJECT"
+
+  - name: 📺Bilibili
+    type: select
+    include-all-proxies: true
+    proxies:
+      - "DIRECT"
+      - "🌏️Main Proxy"
+      - "♾️Auto Select"
+      - "⚖Load Balance"
+      - "REJECT"
+
+  - name: 💰Crypto
+    type: select
+    include-all-proxies: true
+    proxies:
+      - "🌏️Main Proxy"
+      - "♾️Auto Select"
+      - "⚖Load Balance"
+      - "REJECT"
+
+  - name: 🎙️Discord
+    type: select
+    include-all-proxies: true
+    proxies:
+      - "🌏️Main Proxy"
+      - "♾️Auto Select"
+      - "⚖Load Balance"
+      - "REJECT"
+
+  - name: 🎥Disney
+    type: select
+    include-all-proxies: true
+    proxies:
+      - "🌏️Main Proxy"
+      - "♾️Auto Select"
+      - "⚖Load Balance"
+      - "REJECT"
+
+  - name: 🔍Google
+    type: select
+    include-all-proxies: true
+    proxies:
+      - "🌏️Main Proxy"
+      - "♾️Auto Select"
+      - "⚖Load Balance"
+      - "REJECT"
+
+  - name: 🪢Meta
+    type: select
+    include-all-proxies: true
+    proxies:
+      - "🌏️Main Proxy"
+      - "♾️Auto Select"
+      - "⚖Load Balance"
+      - "REJECT"
+
+  - name: 💻Microsoft
+    type: select
+    include-all-proxies: true
+    proxies:
+      - "🌏️Main Proxy"
+      - "♾️Auto Select"
+      - "⚖Load Balance"
+      - "DIRECT"
+      - "REJECT"
+
+  - name: 🎥Netflix
+    type: select
+    include-all-proxies: true
+    proxies:
+      - "🌏️Main Proxy"
+      - "♾️Auto Select"
+      - "⚖Load Balance"
+      - "REJECT"
+
+  - name: 💳PayPal
+    type: select
+    include-all-proxies: true
+    proxies:
+      - "🌏️Main Proxy"
+      - "♾️Auto Select"
+      - "⚖Load Balance"
+      - "DIRECT"
+      - "REJECT"
+
+  - name: 🎨Pixiv
+    type: select
+    include-all-proxies: true
+    proxies:
+      - "🌏️Main Proxy"
+      - "♾️Auto Select"
+      - "⚖Load Balance"
+      - "REJECT"
+
+  - name: 💬Reddit
+    type: select
+    include-all-proxies: true
+    proxies:
+      - "🌏️Main Proxy"
+      - "♾️Auto Select"
+      - "⚖Load Balance"
+      - "REJECT"
+
+  - name: 🎮Steam
+    type: select
+    include-all-proxies: true
+    proxies:
+      - "🌏️Main Proxy"
+      - "♾️Auto Select"
+      - "⚖Load Balance"
+      - "DIRECT"
+      - "REJECT"
+
+  - name: ✈️Telegram
+    type: select
+    include-all-proxies: true
+    proxies:
+      - "🌏️Main Proxy"
+      - "♾️Auto Select"
+      - "⚖Load Balance"
+      - "REJECT"
+
+  - name: 📺Twitch
+    type: select
+    include-all-proxies: true
+    proxies:
+      - "🌏️Main Proxy"
+      - "♾️Auto Select"
+      - "⚖Load Balance"
+      - "REJECT"
+
+  - name: 💬Twitter
+    type: select
+    include-all-proxies: true
+    proxies:
+      - "🌏️Main Proxy"
+      - "♾️Auto Select"
+      - "⚖Load Balance"
+      - "REJECT"
+
+  - name: ⚖Load Balance
+    type: load-balance
+    include-all-proxies: true
+    url: https://cp.cloudflare.com
+    interval: 180
+    lazy: true
+    strategy: consistent-hashing
+
+  - name: ♾️Auto Select
+    type: url-test
+    include-all-proxies: true
+    url: https://cp.cloudflare.com
+    interval: 180
+    lazy: false
+
+rule-providers:
+  AD-Site:
+    type: http
+    behavior: domain
+    format: mrs
+    url: "https://cdn.jsdelivr.net/gh/CauriumX/mihomo-apply@{{RULES_VERSION}}/site/AD-Site.mrs"
+    path: ./ruleset/AD-Site.mrs
+    proxy: DIRECT
+    interval: 600
+
+  Adobe-Site:
+    type: http
+    behavior: domain
+    format: mrs
+    url: "https://cdn.jsdelivr.net/gh/CauriumX/mihomo-apply@{{RULES_VERSION}}/site/Adobe-Site.mrs"
+    path: ./ruleset/Adobe-Site.mrs
+    proxy: DIRECT
+    interval: 600
+
+  AI-Site:
+    type: http
+    behavior: domain
+    format: mrs
+    url: "https://cdn.jsdelivr.net/gh/CauriumX/mihomo-apply@{{RULES_VERSION}}/site/AI-Site.mrs"
+    path: ./ruleset/AI-Site.mrs
+    proxy: DIRECT
+    interval: 600
+
+  Apple-Site:
+    type: http
+    behavior: domain
+    format: mrs
+    url: "https://cdn.jsdelivr.net/gh/CauriumX/mihomo-apply@{{RULES_VERSION}}/site/Apple-Site.mrs"
+    path: ./ruleset/Apple-Site.mrs
+    proxy: DIRECT
+    interval: 600
+
+  Bahamut-Site:
+    type: http
+    behavior: domain
+    format: mrs
+    url: "https://cdn.jsdelivr.net/gh/CauriumX/mihomo-apply@{{RULES_VERSION}}/site/Bahamut-Site.mrs"
+    path: ./ruleset/Bahamut-Site.mrs
+    proxy: DIRECT
+    interval: 600
+
+  Bilibili-Site:
+    type: http
+    behavior: domain
+    format: mrs
+    url: "https://cdn.jsdelivr.net/gh/CauriumX/mihomo-apply@{{RULES_VERSION}}/site/Bilibili-Site.mrs"
+    path: ./ruleset/Bilibili-Site.mrs
+    proxy: DIRECT
+    interval: 600
+
+  China-IP:
+    type: http
+    behavior: ipcidr
+    format: mrs
+    # 方案 C：IP 类极少变更 → 镜像到自己仓库，不依赖服务商存活
+    # 部署镜像后把 CauriumX/mihomo-apply 换成你的用户名/仓库
+    # 未镜像前可临时改回直连：
+    #   url: "https://cdn.jsdelivr.net/gh/CauriumX/mihomo-apply@{{RULES_VERSION}}/site/China-IP.mrs"
+    url: "https://cdn.jsdelivr.net/gh/CauriumX/mihomo-apply@{{RULES_VERSION}}/geoip/China-IP.mrs"
+    path: ./ruleset/China-IP.mrs
+    proxy: DIRECT
+    interval: 86400
+
+  China-Site:
+    type: http
+    behavior: domain
+    format: mrs
+    url: "https://cdn.jsdelivr.net/gh/CauriumX/mihomo-apply@{{RULES_VERSION}}/site/China-Site.mrs"
+    path: ./ruleset/China-Site.mrs
+    proxy: DIRECT
+    interval: 600
+
+  Crypto:
+    type: http
+    behavior: domain
+    format: text
+    # 上游 上游 C 的 Crypto 混入完整 PayPal 规则集（205/417 条，占 49%）
+    # 已用 build-rules.sh 做集合差剔除，产物见 ruleset/Crypto.txt
+    # 用 text 而非 mrs：筛选后需重新编译 mrs，text 无需编译且可读可审计
+    url: "https://cdn.jsdelivr.net/gh/CauriumX/mihomo-apply@{{RULES_VERSION}}/Crypto.txt"
+    path: ./ruleset/Crypto.txt
+    proxy: DIRECT
+    interval: 86400
+
+  Discord-Site:
+    type: http
+    behavior: domain
+    format: mrs
+    url: "https://cdn.jsdelivr.net/gh/CauriumX/mihomo-apply@{{RULES_VERSION}}/site/Discord-Site.mrs"
+    path: ./ruleset/Discord-Site.mrs
+    proxy: DIRECT
+    interval: 600
+
+  Disney-Site:
+    type: http
+    behavior: domain
+    format: mrs
+    url: "https://cdn.jsdelivr.net/gh/CauriumX/mihomo-apply@{{RULES_VERSION}}/site/Disney-Site.mrs"
+    path: ./ruleset/Disney-Site.mrs
+    proxy: DIRECT
+    interval: 600
+
+  Google-Site:
+    type: http
+    behavior: domain
+    format: mrs
+    url: "https://cdn.jsdelivr.net/gh/CauriumX/mihomo-apply@{{RULES_VERSION}}/site/Google-Site.mrs"
+    path: ./ruleset/Google-Site.mrs
+    proxy: DIRECT
+    interval: 600
+
+  Local-IP:
+    type: http
+    behavior: ipcidr
+    format: mrs
+    # 方案 C：IP 类极少变更 → 镜像到自己仓库，不依赖服务商存活
+    # 部署镜像后把 CauriumX/mihomo-apply 换成你的用户名/仓库
+    # 未镜像前可临时改回直连：
+    #   url: "https://cdn.jsdelivr.net/gh/CauriumX/mihomo-apply@{{RULES_VERSION}}/site/Local-IP.mrs"
+    url: "https://cdn.jsdelivr.net/gh/CauriumX/mihomo-apply@{{RULES_VERSION}}/geoip/Local-IP.mrs"
+    path: ./ruleset/Local-IP.mrs
+    proxy: DIRECT
+    interval: 86400
+
+  Meta-Site:
+    type: http
+    behavior: domain
+    format: mrs
+    url: "https://cdn.jsdelivr.net/gh/CauriumX/mihomo-apply@{{RULES_VERSION}}/site/Meta-Site.mrs"
+    path: ./ruleset/Meta-Site.mrs
+    proxy: DIRECT
+    interval: 600
+
+  Microsoft-Site:
+    type: http
+    behavior: domain
+    format: mrs
+    url: "https://cdn.jsdelivr.net/gh/CauriumX/mihomo-apply@{{RULES_VERSION}}/site/Microsoft-Site.mrs"
+    path: ./ruleset/Microsoft-Site.mrs
+    proxy: DIRECT
+    interval: 600
+
+  Netflix-Site:
+    type: http
+    behavior: domain
+    format: mrs
+    url: "https://cdn.jsdelivr.net/gh/CauriumX/mihomo-apply@{{RULES_VERSION}}/site/Netflix-Site.mrs"
+    path: ./ruleset/Netflix-Site.mrs
+    proxy: DIRECT
+    interval: 600
+
+  PayPal:
+    type: http
+    behavior: domain
+    format: text
+    # 上游 PayPal.txt 原样镜像（206 条），未经筛选
+    # 注意：只有根目录 /mihomo/PayPal.txt 有效，
+    #       /mihomo/domain/PayPal.txt 返回 404 HTML
+    url: "https://cdn.jsdelivr.net/gh/CauriumX/mihomo-apply@{{RULES_VERSION}}/PayPal.txt"
+    path: ./ruleset/PayPal.txt
+    proxy: DIRECT
+    interval: 86400
+
+  Pixiv-Site:
+    type: http
+    behavior: domain
+    format: mrs
+    url: "https://cdn.jsdelivr.net/gh/CauriumX/mihomo-apply@{{RULES_VERSION}}/site/Pixiv-Site.mrs"
+    path: ./ruleset/Pixiv-Site.mrs
+    proxy: DIRECT
+    interval: 600
+
+  Reddit-Site:
+    type: http
+    behavior: domain
+    format: mrs
+    url: "https://cdn.jsdelivr.net/gh/CauriumX/mihomo-apply@{{RULES_VERSION}}/site/Reddit-Site.mrs"
+    path: ./ruleset/Reddit-Site.mrs
+    proxy: DIRECT
+    interval: 600
+
+  Steam-Site:
+    type: http
+    behavior: domain
+    format: mrs
+    url: "https://cdn.jsdelivr.net/gh/CauriumX/mihomo-apply@{{RULES_VERSION}}/site/Steam-Site.mrs"
+    path: ./ruleset/Steam-Site.mrs
+    proxy: DIRECT
+    interval: 600
+
+  Telegram-IP:
+    type: http
+    behavior: ipcidr
+    format: mrs
+    # 方案 C：IP 类极少变更 → 镜像到自己仓库，不依赖服务商存活
+    # 部署镜像后把 CauriumX/mihomo-apply 换成你的用户名/仓库
+    # 未镜像前可临时改回直连：
+    #   url: "https://cdn.jsdelivr.net/gh/CauriumX/mihomo-apply@{{RULES_VERSION}}/site/Telegram-IP.mrs"
+    url: "https://cdn.jsdelivr.net/gh/CauriumX/mihomo-apply@{{RULES_VERSION}}/geoip/Telegram-IP.mrs"
+    path: ./ruleset/Telegram-IP.mrs
+    proxy: DIRECT
+    interval: 86400
+
+  Telegram-Site:
+    type: http
+    behavior: domain
+    format: mrs
+    url: "https://cdn.jsdelivr.net/gh/CauriumX/mihomo-apply@{{RULES_VERSION}}/site/Telegram-Site.mrs"
+    path: ./ruleset/Telegram-Site.mrs
+    proxy: DIRECT
+    interval: 600
+
+  Twitch-Site:
+    type: http
+    behavior: domain
+    format: mrs
+    url: "https://cdn.jsdelivr.net/gh/CauriumX/mihomo-apply@{{RULES_VERSION}}/site/Twitch-Site.mrs"
+    path: ./ruleset/Twitch-Site.mrs
+    proxy: DIRECT
+    interval: 600
+
+  Twitter-Site:
+    type: http
+    behavior: domain
+    format: mrs
+    url: "https://cdn.jsdelivr.net/gh/CauriumX/mihomo-apply@{{RULES_VERSION}}/site/Twitter-Site.mrs"
+    path: ./ruleset/Twitter-Site.mrs
+    proxy: DIRECT
+    interval: 600
+
+# ============================================================================
+# 规则 —— 与服务商标准配置完全一致，未做任何改动
+# ============================================================================
+
+rules:
+  - "RULE-SET,Local-IP,DIRECT,no-resolve"
+  - "AND,((DST-PORT,443),(NETWORK,UDP)),REJECT"
+  - "DST-PORT,25/587/465/143/993/110/995,DIRECT"
+  - "DOMAIN,ntp.aliyun.com,DIRECT"
+  - "DOMAIN-SUFFIX,lan,DIRECT"
+  - "DOMAIN-SUFFIX,local,DIRECT"
+  - "DOMAIN,localhost.ptlogin2.qq.com,DIRECT"
+  - "DOMAIN-SUFFIX,msftconnecttest.com,🌏️Main Proxy"
+  - "DOMAIN-SUFFIX,msftncsi.com,🌏️Main Proxy"
+  - "DOMAIN,alt1-mtalk.google.com,🔍Google"
+  - "DOMAIN,alt2-mtalk.google.com,🔍Google"
+  - "DOMAIN,alt3-mtalk.google.com,🔍Google"
+  - "DOMAIN,alt4-mtalk.google.com,🔍Google"
+  - "DOMAIN,alt5-mtalk.google.com,🔍Google"
+  - "DOMAIN,alt6-mtalk.google.com,🔍Google"
+  - "DOMAIN,alt7-mtalk.google.com,🔍Google"
+  - "DOMAIN,alt8-mtalk.google.com,🔍Google"
+  - "DOMAIN,mtalk.google.com,🔍Google"
+  - "DOMAIN,local.adguard.org,DIRECT"
+  - "DOMAIN,injections.adguard.org,DIRECT"
+  - "DOMAIN-SUFFIX,googleapis.com,🔍Google"
+  - "DOMAIN-SUFFIX,googleapis.cn,🔍Google"
+  - "PROCESS-NAME,xray.exe,DIRECT"
+  - "PROCESS-NAME,sing-box.exe,DIRECT"
+  - "PROCESS-NAME,DownloadSDKServer.exe,DIRECT"
+  - "PROCESS-NAME,CrossDeviceResume.exe,DIRECT"
+  - "PROCESS-NAME,CrossDeviceService.exe,DIRECT"
+  - "PROCESS-NAME,PhoneExperienceHost.exe,DIRECT"
+  - "AND,((PROCESS-NAME,baidunetdiskhost.exe),(DST-PORT,80/1000-65535)),REJECT"
+  - "RULE-SET,AD-Site,REJECT"
+  # >>> PAYPAL-PHISH-INLINE (auto-generated, do not edit by hand)
+  # PayPal 钓鱼/仿冒域名（内联，省一次 provider 请求）
+  # 判定依据：DNS MX 证据 —— 官方 MX=mx1.paypalcorp.com，
+  #          钓鱼站无 MX 或 MX=bh.markmonitor.com（品牌保护商已收购停用）
+  # 已校验：不含 paypal.com / paypalobjects.com / paypalinc.com 等官方域名
+  # 由 filter-paypal-phish.py 生成，sync-inline-phish.py 注入
+  - "DOMAIN-SUFFIX,briantreepayments.net,REJECT"
+  - "DOMAIN-SUFFIX,briantreepayments.tv,REJECT"
+  - "DOMAIN-SUFFIX,pa9pal.com,REJECT"
+  - "DOMAIN-SUFFIX,paaypal.com,REJECT"
+  - "DOMAIN-SUFFIX,paipal.com,REJECT"
+  - "DOMAIN-SUFFIX,pavpal.com,REJECT"
+  - "DOMAIN-SUFFIX,paypa1.com,REJECT"
+  - "DOMAIN-SUFFIX,paypa1.org,REJECT"
+  - "DOMAIN-SUFFIX,paypaal.com,REJECT"
+  - "DOMAIN-SUFFIX,paypal-secure.net,REJECT"
+  - "DOMAIN-SUFFIX,paypal-secure.org,REJECT"
+  - "DOMAIN-SUFFIX,paypal-security.net,REJECT"
+  - "DOMAIN-SUFFIX,paypal-security.org,REJECT"
+  - "DOMAIN-SUFFIX,payppal.com,REJECT"
+  - "DOMAIN-SUFFIX,payypal.com,REJECT"
+  # <<< PAYPAL-PHISH-INLINE
+  # ---------- 服务分流（按 provider 名称字母序） ----------
+  - "RULE-SET,AI-Site,🤖AI"
+  - "RULE-SET,Adobe-Site,💡Adobe"
+  - "RULE-SET,Bahamut-Site,🌸Bahamut"
+  - "RULE-SET,Bilibili-Site,📺Bilibili"
+  - "RULE-SET,Crypto,💰Crypto"
+  - "RULE-SET,Discord-Site,🎙️Discord"
+  - "RULE-SET,Disney-Site,🎥Disney"
+  - "RULE-SET,Meta-Site,🪢Meta"
+  - "RULE-SET,Netflix-Site,🎥Netflix"
+  - "RULE-SET,PayPal,💳PayPal"
+  - "RULE-SET,Pixiv-Site,🎨Pixiv"
+  - "RULE-SET,Reddit-Site,💬Reddit"
+  - "RULE-SET,Steam-Site,🎮Steam"
+  - "RULE-SET,Telegram-Site,✈️Telegram"
+  - "RULE-SET,Twitch-Site,📺Twitch"
+  - "RULE-SET,Twitter-Site,💬Twitter"
+  # ---------- 大厂与国内（放后，避免抢走服务分流） ----------
+  - "RULE-SET,Apple-Site,🍎Apple"
+  - "RULE-SET,Google-Site,🔍Google"
+  - "RULE-SET,Microsoft-Site,💻Microsoft"
+  - "RULE-SET,China-Site,🇨🇳China Services"
+  # ---------- IP 类（放最后，避免过度解析） ----------
+  - "RULE-SET,Telegram-IP,✈️Telegram,no-resolve"
+  - "RULE-SET,China-IP,🇨🇳China Services"
+  - "MATCH,🌏️Main Proxy"
+# hook 流程验证标记
