@@ -652,12 +652,15 @@ rule-providers:
   Crypto:
     type: http
     behavior: domain
-    format: text
-    # 上游 上游 C 的 Crypto 混入完整 PayPal 规则集（205/417 条，占 49%）
-    # 已用 build-rules.sh 做集合差剔除，产物见 ruleset/Crypto.txt
-    # 用 text 而非 mrs：筛选后需重新编译 mrs，text 无需编译且可读可审计
-    url: "https://cdn.jsdelivr.net/gh/CauriumX/mihomo-apply@{{RULES_VERSION}}/Crypto.txt"
-    path: ./ruleset/Crypto.txt
+    format: mrs
+    # 上游的 Crypto 混入完整 PayPal 规则集（205/417 条，占 49%），
+    # 已用 build-rules.sh 做集合差剔除。
+    #
+    # 5 条 DOMAIN-KEYWORD（binance / binancezh / huobi / okx-dns / saasexch）
+    # 无法放进 mrs —— 该格式只支持 exact 与 suffix。它们内联在 rules: 段，
+    # 见「Crypto keyword」那几行。
+    url: "https://cdn.jsdelivr.net/gh/CauriumX/mihomo-apply@{{RULES_VERSION}}/Crypto.mrs"
+    path: ./ruleset/Crypto.mrs
     proxy: DIRECT
     interval: 86400
 
@@ -731,12 +734,14 @@ rule-providers:
   PayPal:
     type: http
     behavior: domain
-    format: text
-    # 上游 PayPal.txt 原样镜像（206 条），未经筛选
-    # 注意：只有根目录 /mihomo/PayPal.txt 有效，
-    #       /mihomo/domain/PayPal.txt 返回 404 HTML
-    url: "https://cdn.jsdelivr.net/gh/CauriumX/mihomo-apply@{{RULES_VERSION}}/PayPal.txt"
-    path: ./ruleset/PayPal.txt
+    format: mrs
+    # 上游 PayPal 规则集经 filters/paypal.yaml 分离：官方域名走本 provider，
+    # 钓鱼域名内联为 REJECT（见 rules: 段的 PayPal 钓鱼部分）。
+    #
+    # 9 条 DOMAIN-KEYWORD（paypal / pypl / venmo / xoom 等）无法放进 mrs，
+    # 内联在 rules: 段，见「PayPal keyword」那几行。
+    url: "https://cdn.jsdelivr.net/gh/CauriumX/mihomo-apply@{{RULES_VERSION}}/PayPal.mrs"
+    path: ./ruleset/PayPal.mrs
     proxy: DIRECT
     interval: 86400
 
@@ -869,11 +874,30 @@ rules:
   - "RULE-SET,Adobe-Site,💡Adobe"
   - "RULE-SET,Bahamut-Site,🌸Bahamut"
   - "RULE-SET,Bilibili-Site,📺Bilibili"
+  # Crypto keyword —— mrs 只支持 exact/suffix，这 5 条只能内联。
+  # 必须在 RULE-SET,Crypto 之前，否则域名被 mrs 的 suffix 规则先匹配走。
+  - "DOMAIN-KEYWORD,binance,💰Crypto"
+  - "DOMAIN-KEYWORD,binancezh,💰Crypto"
+  - "DOMAIN-KEYWORD,huobi,💰Crypto"
+  - "DOMAIN-KEYWORD,okx-dns,💰Crypto"
+  - "DOMAIN-KEYWORD,saasexch,💰Crypto"
   - "RULE-SET,Crypto,💰Crypto"
   - "RULE-SET,Discord-Site,🎙️Discord"
   - "RULE-SET,Disney-Site,🎥Disney"
   - "RULE-SET,Meta-Site,🪢Meta"
   - "RULE-SET,Netflix-Site,🎥Netflix"
+  # PayPal keyword —— 同上，9 条内联。
+  # paypal / pypl / venmo / xoom 等关键词能覆盖大量变体域名，
+  # 放进 mrs 会退化成 exact 匹配（只匹配字面量 "paypal"），等于失效。
+  - "DOMAIN-KEYWORD,braintreepayments,💳PayPal"
+  - "DOMAIN-KEYWORD,paypal,💳PayPal"
+  - "DOMAIN-KEYWORD,paypal-center,💳PayPal"
+  - "DOMAIN-KEYWORD,paypal-login,💳PayPal"
+  - "DOMAIN-KEYWORD,paypalcommunity,💳PayPal"
+  - "DOMAIN-KEYWORD,paypalhere,💳PayPal"
+  - "DOMAIN-KEYWORD,pypl,💳PayPal"
+  - "DOMAIN-KEYWORD,venmo,💳PayPal"
+  - "DOMAIN-KEYWORD,xoom,💳PayPal"
   - "RULE-SET,PayPal,💳PayPal"
   - "RULE-SET,Pixiv-Site,🎨Pixiv"
   - "RULE-SET,Reddit-Site,💬Reddit"
