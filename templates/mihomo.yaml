@@ -824,20 +824,22 @@ rules:
   # 走代理，而代理组里选中的节点已失效或为空，请求发不出去 —— 客户端
   # 就永远拉不到新配置，形成死锁（TUN 模式下尤其明显）。
   #
-  # 四个域名覆盖：
+  # 三个域名覆盖：
   #   cdn.jsdelivr.net   规则集与模板的实际分发（mihomo-apply@<tag>）
   #   jsdelivr.net       同上，子域兜底
-  #   pages.dev          MiSub 部署域名（*.pages.dev）
-  #   自定义域名         MiSub 自建域名，发布时由 release.sh --domain 填入
+  #   pages.dev          Cloudflare Pages 的默认域名（*.pages.dev）
   #
-  # 自定义域名这段不能写死：每个部署实例的域名不同，写死就只能覆盖
-  # 自己的那一个。发布时未提供 --domain 时，下面最后一条规则
-  # 会在渲染时被整行移除（见 release.sh 的渲染步骤）。
+  # 这里只放「对所有使用本模板的人都成立」的域名。上面两个是本仓库自己的
+  # 分发地址，pages.dev 是 Cloudflare Pages 分配给每个项目的默认域名。
+  #
+  # 自定义域名不进来：每个 MiSub 部署绑的域名都不同，写进共享仓库要么只能
+  # 覆盖某一个实例，要么靠占位符把实例配置传染进发布产物。自定义域名属于
+  # 部署侧（Cloudflare Pages 的 Custom domains 或 MiSub 后台），不属于这里。
+  # 自行绑了域名的用户应在自己的配置里补一条 DOMAIN-SUFFIX,<你的域名>,DIRECT。
   # ---------------------------------------------------------------------------
   - "DOMAIN-SUFFIX,cdn.jsdelivr.net,DIRECT"
   - "DOMAIN-SUFFIX,jsdelivr.net,DIRECT"
   - "DOMAIN-SUFFIX,pages.dev,DIRECT"
-  - "DOMAIN-SUFFIX,{{SUBSCRIPTION_DOMAIN}},DIRECT"
 
   - "RULE-SET,Local-IP,DIRECT,no-resolve"
   - "AND,((DST-PORT,443),(NETWORK,UDP)),REJECT"

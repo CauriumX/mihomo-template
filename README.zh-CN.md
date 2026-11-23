@@ -49,11 +49,16 @@ mihomo 规则体系的模板源：
 
 - **24 个代理组**，全部使用 `include-all-proxies: true`
 - **24 个规则提供者**，每个 URL 携带 `{{RULES_VERSION}}` 而不是活的 ref
-- **86 条规则**，顺序保证拦截与订阅更新先执行
+- **85 条规则**，顺序保证拦截与订阅更新先执行
 
-订阅域名直连规则里有一条 `{{SUBSCRIPTION_DOMAIN}}` 占位符：不同的 MiSub
-部署有不同的自定义域名，写死只能覆盖自己的那一个。发布时由
-`release.sh --domain <host>` 填入；未提供则整条规则在渲染时移除。
+订阅域名直连规则只包含对所有使用者都成立的全域名：jsDelivr（本仓库自己的
+分发地址）与 `pages.dev`（Cloudflare Pages 的默认域名）。
+
+**自定义域名不进仓库。** 每个 MiSub 部署绑的域名都不同，写进共享仓库要么
+只能覆盖某一个实例，要么靠占位符把实例配置传染进发布产物。绑定域名是部署侧
+的事（Cloudflare Pages 的 Custom domains），模板只负责后端规则与分发。
+自行绑了域名的用户，在自己的配置里补一条
+`DOMAIN-SUFFIX,<你的域名>,DIRECT` 即可。
 
 本仓库不发布。渲染与发布在 [mihomo-apply](https://github.com/CauriumX/mihomo-apply) 完成。
 
