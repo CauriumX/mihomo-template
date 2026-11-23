@@ -824,14 +824,20 @@ rules:
   # 走代理，而代理组里选中的节点已失效或为空，请求发不出去 —— 客户端
   # 就永远拉不到新配置，形成死锁（TUN 模式下尤其明显）。
   #
-  # 这三个域名覆盖：
+  # 四个域名覆盖：
   #   cdn.jsdelivr.net   规则集与模板的实际分发（mihomo-apply@<tag>）
   #   jsdelivr.net       同上，子域兜底
   #   pages.dev          MiSub 部署域名（*.pages.dev）
+  #   自定义域名         MiSub 自建域名，发布时由 release.sh --domain 填入
+  #
+  # 自定义域名这段不能写死：每个部署实例的域名不同，写死就只能覆盖
+  # 自己的那一个。发布时未提供 --domain 时，下面最后一条规则
+  # 会在渲染时被整行移除（见 release.sh 的渲染步骤）。
   # ---------------------------------------------------------------------------
   - "DOMAIN-SUFFIX,cdn.jsdelivr.net,DIRECT"
   - "DOMAIN-SUFFIX,jsdelivr.net,DIRECT"
   - "DOMAIN-SUFFIX,pages.dev,DIRECT"
+  - "DOMAIN-SUFFIX,{{SUBSCRIPTION_DOMAIN}},DIRECT"
 
   - "RULE-SET,Local-IP,DIRECT,no-resolve"
   - "AND,((DST-PORT,443),(NETWORK,UDP)),REJECT"

@@ -113,6 +113,13 @@ jobs:
           PY
 
       # 用真实 mihomo 加载。渲染占位符后注入假节点，验证内核接受这份配置。
+      #
+      # 占位符必须先替换掉再加载。render-check 只注入 proxies，不处理占位符；
+      # 而 mihomo 对 "DOMAIN-SUFFIX,{{SUBSCRIPTION_DOMAIN}},DIRECT" 这种行
+      # 并不报错 —— 它把占位符当字面量收下。于是加载测试会绿，但那个模板
+      # 实际发布出去就带了一条永远不命中的垃圾规则。
+      #
+      # 占位符以示例值渲染，让这一步测的是接近真实发布的形态。
       - name: Loads in real mihomo
         run: |
           set -euo pipefail
@@ -124,7 +131,18 @@ jobs:
 
           # 模板 proxies: [] 由订阅服务注入节点。这里渲染时补占位节点，
           # 让 select 组能解析，再交给内核做真实校验。
-          node tools/render-check.mjs templates/mihomo.yaml --out /tmp/rendered.yaml
+          sed -e 's/{{RULES_VERSION}}/v0.1.0/g' \
+              -e 's/{{SUBSCRIPTION_DOMAIN}}/sub.example.com/g' \
+              templates/mihomo.yaml > /tmp/template.rendered.yaml
+          node tools/render-check.mjs /tmp/template.rendered.yaml --out /tmp/rendered.yaml
+
+          # 渲染后不应再有任何占位符残留。
+          if grep -q '{{' /tmp/rendered.yaml; then
+            echo '错误：加载前仍有未替换的占位符' >&2
+            grep -n '{{' /tmp/rendered.yaml >&2
+            exit 1
+          fi
+
           /tmp/mihomo -t -d /tmp -f /tmp/rendered.yaml
 
       # 旧版内核兼容：v1.19.18 是 FilterRule 出现前的最后一个版本。

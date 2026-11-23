@@ -52,8 +52,13 @@ breakage detectable before it ships.
 The template source for the mihomo rules pipeline:
 
 - **24 proxy groups**, all using `include-all-proxies: true`
-- **27 rule-providers**, every URL carrying `{{RULES_VERSION}}` instead of a live ref
-- **85 rules**, ordered so that rejects and subscription updates run first
+- **24 rule-providers**, every URL carrying `{{RULES_VERSION}}` instead of a live ref
+- **86 rules**, ordered so that rejects and subscription updates run first
+
+One of the subscription-DIRECT rules carries a `{{SUBSCRIPTION_DOMAIN}}`
+placeholder: every MiSub deployment has its own custom domain, so hard-coding
+one would only cover that deployment. `release.sh --domain <host>` fills it in
+at release time; if omitted, the whole rule is dropped during rendering.
 
 It does not publish. Rendering and release happen in
 [mihomo-apply](https://github.com/CauriumX/mihomo-apply).

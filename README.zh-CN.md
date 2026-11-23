@@ -48,8 +48,12 @@ mihomo 模板不是写一次就完的配置文件。它是每个客户端启动�
 mihomo 规则体系的模板源：
 
 - **24 个代理组**，全部使用 `include-all-proxies: true`
-- **27 个规则提供者**，每个 URL 携带 `{{RULES_VERSION}}` 而不是活的 ref
-- **85 条规则**，顺序保证拦截与订阅更新先执行
+- **24 个规则提供者**，每个 URL 携带 `{{RULES_VERSION}}` 而不是活的 ref
+- **86 条规则**，顺序保证拦截与订阅更新先执行
+
+订阅域名直连规则里有一条 `{{SUBSCRIPTION_DOMAIN}}` 占位符：不同的 MiSub
+部署有不同的自定义域名，写死只能覆盖自己的那一个。发布时由
+`release.sh --domain <host>` 填入；未提供则整条规则在渲染时移除。
 
 本仓库不发布。渲染与发布在 [mihomo-apply](https://github.com/CauriumX/mihomo-apply) 完成。
 
