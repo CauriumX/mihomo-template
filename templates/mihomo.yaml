@@ -361,16 +361,6 @@ proxy-groups:
       - "⚖Load Balance"
       - "REJECT"
 
-  - name: 💡Adobe
-    type: select
-    include-all-proxies: true
-    proxies:
-      - "🌏️Main Proxy"
-      - "♾️Auto Select"
-      - "⚖Load Balance"
-      - "DIRECT"
-      - "REJECT"
-
   - name: 🤖AI
     type: select
     include-all-proxies: true
@@ -380,7 +370,16 @@ proxy-groups:
       - "⚖Load Balance"
       - "REJECT"
 
-  - name: 🍎Apple
+  - name: 📖IntlAcademic
+    type: select
+    include-all-proxies: true
+    proxies:
+      - "🌏️Main Proxy"
+      - "♾️Auto Select"
+      - "⚖Load Balance"
+      - "REJECT"
+
+  - name: 💡Adobe
     type: select
     include-all-proxies: true
     proxies:
@@ -436,24 +435,6 @@ proxy-groups:
       - "⚖Load Balance"
       - "REJECT"
 
-  - name: 🔍Google
-    type: select
-    include-all-proxies: true
-    proxies:
-      - "🌏️Main Proxy"
-      - "♾️Auto Select"
-      - "⚖Load Balance"
-      - "REJECT"
-
-  - name: 📖IntlAcademic
-    type: select
-    include-all-proxies: true
-    proxies:
-      - "🌏️Main Proxy"
-      - "♾️Auto Select"
-      - "⚖Load Balance"
-      - "REJECT"
-
   - name: 🪢Meta
     type: select
     include-all-proxies: true
@@ -461,16 +442,6 @@ proxy-groups:
       - "🌏️Main Proxy"
       - "♾️Auto Select"
       - "⚖Load Balance"
-      - "REJECT"
-
-  - name: 💻Microsoft
-    type: select
-    include-all-proxies: true
-    proxies:
-      - "🌏️Main Proxy"
-      - "♾️Auto Select"
-      - "⚖Load Balance"
-      - "DIRECT"
       - "REJECT"
 
   - name: 🎥Netflix
@@ -565,6 +536,35 @@ proxy-groups:
       - "⚖Load Balance"
       - "REJECT"
 
+  - name: 🍎Apple
+    type: select
+    include-all-proxies: true
+    proxies:
+      - "🌏️Main Proxy"
+      - "♾️Auto Select"
+      - "⚖Load Balance"
+      - "DIRECT"
+      - "REJECT"
+
+  - name: 🔍Google
+    type: select
+    include-all-proxies: true
+    proxies:
+      - "🌏️Main Proxy"
+      - "♾️Auto Select"
+      - "⚖Load Balance"
+      - "REJECT"
+
+  - name: 💻Microsoft
+    type: select
+    include-all-proxies: true
+    proxies:
+      - "🌏️Main Proxy"
+      - "♾️Auto Select"
+      - "⚖Load Balance"
+      - "DIRECT"
+      - "REJECT"
+
   - name: ⚖Load Balance
     type: load-balance
     include-all-proxies: true
@@ -609,6 +609,15 @@ rule-providers:
     interval: 86400
 
   # --- 新增类目（Sakura 源，2026-11 接入）---
+  IntlAcademic-Site:
+    type: http
+    behavior: domain
+    format: mrs
+    url: "https://cdn.jsdelivr.net/gh/CauriumX/mihomo-apply@{{RULES_VERSION}}/site/IntlAcademic-Site.mrs"
+    path: ./ruleset/IntlAcademic-Site.mrs
+    proxy: DIRECT
+    interval: 86400
+
   Apple-Site:
     type: http
     behavior: domain
@@ -697,15 +706,6 @@ rule-providers:
     format: mrs
     url: "https://cdn.jsdelivr.net/gh/CauriumX/mihomo-apply@{{RULES_VERSION}}/site/Google-Site.mrs"
     path: ./ruleset/Google-Site.mrs
-    proxy: DIRECT
-    interval: 86400
-
-  IntlAcademic-Site:
-    type: http
-    behavior: domain
-    format: mrs
-    url: "https://cdn.jsdelivr.net/gh/CauriumX/mihomo-apply@{{RULES_VERSION}}/site/IntlAcademic-Site.mrs"
-    path: ./ruleset/IntlAcademic-Site.mrs
     proxy: DIRECT
     interval: 86400
 
