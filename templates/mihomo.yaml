@@ -280,7 +280,16 @@ dns:
 
 tun:
   enable: true
-  stack: system
+  # mips —— mihomo 自研的纯 Go 用户态 IP 栈（github.com/metacubex/mipstack）。
+  #
+  # 为什么不用 system：system 走内核栈，吞吐最高，但 Windows/macOS/Android
+  # 行为不一致，部分 UDP/ICMP 与 fake-ip 场景兼容性差。mips 跨平台行为一致，
+  # 内存开销低于 gvisor，是 upstream 目前的默认值。
+  #
+  # ⚠️ 版本要求：mips 自 mihomo v1.19.31 起支持。更早的内核会报
+  #    `invalid tun stack` 并直接拒绝加载整份配置（实测 v1.19.18/1.19.30 均失败）。
+  #    订阅端的客户端若是旧内核，请改用 stack: system 或升级内核。
+  stack: mips
   auto-route: true
   auto-detect-interface: true
   strict-route: true

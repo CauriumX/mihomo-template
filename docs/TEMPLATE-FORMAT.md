@@ -221,13 +221,17 @@ Google 分流）对这类连接全部失效。
 ```yaml
 tun:
   enable: true
-  stack: system
+  stack: mips
   auto-route: true
   device: DsotM-Tunnel
   route-exclude-address: [10.0.0.0/8, 100.64.0.0/10, …]
 ```
 
 没有 tun，桌面端无法做全局透明代理。
+
+`stack: mips` 是 mihomo 自研的纯 Go 用户态 IP 栈，跨平台行为一致、内存低于 gvisor。
+**它要求内核 ≥ v1.19.31**（v1.19.30 及更早会报 `invalid tun stack` 并拒绝加载整份配置）。
+需要兼容更早内核时改回 `stack: system`。
 
 ---
 
