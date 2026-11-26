@@ -145,10 +145,16 @@ jobs:
           /tmp/mihomo -t -d /tmp -f /tmp/rendered.yaml
 
       # 旧版内核兼容：v1.19.18 是 FilterRule 出现前的最后一个版本。
-      - name: Loads on mihomo v1.19.18
+      # 最低支持内核：模板同时要求
+      #   tun.stack: mips              → mihomo >= v1.19.31（实测 1.19.18/1.19.30 报 invalid tun stack）
+      #   dns.fake-ip-filter-mode: rule → mihomo >= v1.19.24（实测 1.19.22 报 invalid mode）
+      # 取更严的那个：v1.19.31。
+      #
+      # 原来这里测 v1.19.18，模板改完后必然红 —— 门槛必须等于真实下限才有意义。
+      - name: Loads on mihomo v1.19.31 (minimum supported)
         run: |
           set -euo pipefail
-          MIHOMO_VERSION=v1.19.18
+          MIHOMO_VERSION=v1.19.31
           curl -sSL -o /tmp/mihomo-old.gz \
             "https://github.com/MetaCubeX/mihomo/releases/download/${MIHOMO_VERSION}/mihomo-linux-amd64-${MIHOMO_VERSION}.gz"
           gunzip -f /tmp/mihomo-old.gz && chmod +x /tmp/mihomo-old

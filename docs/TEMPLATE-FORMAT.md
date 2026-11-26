@@ -231,6 +231,7 @@ tun:
 
 `stack: mips` 是 mihomo 自研的纯 Go 用户态 IP 栈，跨平台行为一致、内存低于 gvisor。
 **它要求内核 ≥ v1.19.31**（v1.19.30 及更早会报 `invalid tun stack` 并拒绝加载整份配置）。
+DNS 的 `fake-ip-filter-mode: rule` 另需 ≥ v1.19.24（v1.19.22 报 `invalid mode`）；两项合起来的下限仍是 **v1.19.31**。
 需要兼容更早内核时改回 `stack: system`。
 
 ---
