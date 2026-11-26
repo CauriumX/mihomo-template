@@ -20,7 +20,7 @@
 | YAML 能按地区分组吗？ | ✅ 能。`filter` 正则，已用真实 mihomo 实测 |
 | ini 有什么 YAML 没有的？ | 只有 `<%regionStrategyChain%>` 自动生成地区组 |
 | 改 ini 的代价 | ❌ **丢失 `dns` / `sniffer` / `tun` 三个整段** + `.mrs` 规则集 |
-| 本仓库选择 | **保留 YAML**，不加地区组（24 个服务组已覆盖实际场景） |
+| 本仓库选择 | **保留 YAML**，不加地区组（27 个服务组已覆盖实际场景） |
 
 ---
 
@@ -257,7 +257,7 @@ MiSub 的 `REGION_DISPLAY_CONFIG` 定义了 17 个地区（`region-groups.js:2`�
 
 ### 5.1 为什么不加地区组
 
-节点只有 4 个地区（US / DE / AU / HK），而现有 24 个**服务组**已经覆盖实际场景：
+节点只有 4 个地区（US / DE / AU / HK），而现有 27 个**服务组**已经覆盖实际场景：
 
 ```
 🤖AI  🔍Google  🎥Netflix  🎬Disney  📺Twitch  💬Twitter
@@ -321,4 +321,4 @@ MiSub 的 `REGION_DISPLAY_CONFIG` 定义了 17 个地区（`region-groups.js:2`�
 - MiSub `functions/services/processor-service.js:38` — `isIniTemplateSource`
 - mihomo `adapter/outboundgroup/parser.go:74-94` — `include-all-proxies` + `filter` 展开
 - 本仓库 `docs/NODE-ORDERING.md` — 节点排序机制（配套文档）
-- 本仓库 `templates/mihomo.yaml` — 24 个服务组
+- 本仓库 `templates/mihomo.yaml` — 27 个服务组

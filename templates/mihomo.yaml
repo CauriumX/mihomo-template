@@ -3,7 +3,7 @@
 #
 # 完整保留 dns / sniffer / ntp / tun 全部设置，仅做必要改动：
 #   1. 新增 proxies: []            —— MiSub 注入节点
-#   2. 新增 proxy-groups:          —— 补全 24 个策略组
+#   2. 新增 proxy-groups:          —— 补全 27 个策略组
 #   3. tun.device: DsotM-Tunnel
 #   4. 新增 💰Crypto / 💳PayPal 组
 #   5. 内联 15 条 PayPal 钓鱼域名拦截
@@ -13,7 +13,7 @@
 # ============================================================================
 #   全部规则集均镜像到本仓库，不依赖任何第三方域名存活。
 #
-#   域名类（19 个）→ ruleset/site/*.mrs
+#   域名类（22 个）→ ruleset/site/*.mrs
 #     AD / Adobe / AI / Apple / Bahamut / Bilibili / China / Discord /
 #     Disney / Google / Meta / Microsoft / Netflix / Pixiv / Reddit /
 #     Steam / Telegram / Twitch / Twitter
@@ -557,6 +557,33 @@ proxy-groups:
       - "⚖Load Balance"
       - "REJECT"
 
+  - name: 📖IntlAcademic
+    type: select
+    include-all-proxies: true
+    proxies:
+      - "🌏️Main Proxy"
+      - "♾️Auto Select"
+      - "⚖Load Balance"
+      - "REJECT"
+
+  - name: 🎮PlayStation
+    type: select
+    include-all-proxies: true
+    proxies:
+      - "🌏️Main Proxy"
+      - "♾️Auto Select"
+      - "⚖Load Balance"
+      - "REJECT"
+
+  - name: 🎵Spotify
+    type: select
+    include-all-proxies: true
+    proxies:
+      - "🌏️Main Proxy"
+      - "♾️Auto Select"
+      - "⚖Load Balance"
+      - "REJECT"
+
   - name: ⚖Load Balance
     type: load-balance
     include-all-proxies: true
@@ -580,7 +607,7 @@ rule-providers:
     url: "https://cdn.jsdelivr.net/gh/CauriumX/mihomo-apply@{{RULES_VERSION}}/site/AD-Site.mrs"
     path: ./ruleset/AD-Site.mrs
     proxy: DIRECT
-    interval: 600
+    interval: 86400
 
   Adobe-Site:
     type: http
@@ -589,7 +616,7 @@ rule-providers:
     url: "https://cdn.jsdelivr.net/gh/CauriumX/mihomo-apply@{{RULES_VERSION}}/site/Adobe-Site.mrs"
     path: ./ruleset/Adobe-Site.mrs
     proxy: DIRECT
-    interval: 600
+    interval: 86400
 
   AI-Site:
     type: http
@@ -598,7 +625,35 @@ rule-providers:
     url: "https://cdn.jsdelivr.net/gh/CauriumX/mihomo-apply@{{RULES_VERSION}}/site/AI-Site.mrs"
     path: ./ruleset/AI-Site.mrs
     proxy: DIRECT
-    interval: 600
+    interval: 86400
+
+  # --- 新增类目（Sakura 源，2026-11 接入）---
+  IntlAcademic-Site:
+    type: http
+    behavior: domain
+    format: mrs
+    url: "https://cdn.jsdelivr.net/gh/CauriumX/mihomo-apply@{{RULES_VERSION}}/site/IntlAcademic-Site.mrs"
+    path: ./ruleset/IntlAcademic-Site.mrs
+    proxy: DIRECT
+    interval: 86400
+
+  PlayStation-Site:
+    type: http
+    behavior: domain
+    format: mrs
+    url: "https://cdn.jsdelivr.net/gh/CauriumX/mihomo-apply@{{RULES_VERSION}}/site/PlayStation-Site.mrs"
+    path: ./ruleset/PlayStation-Site.mrs
+    proxy: DIRECT
+    interval: 86400
+
+  Spotify-Site:
+    type: http
+    behavior: domain
+    format: mrs
+    url: "https://cdn.jsdelivr.net/gh/CauriumX/mihomo-apply@{{RULES_VERSION}}/site/Spotify-Site.mrs"
+    path: ./ruleset/Spotify-Site.mrs
+    proxy: DIRECT
+    interval: 86400
 
   Apple-Site:
     type: http
@@ -607,7 +662,7 @@ rule-providers:
     url: "https://cdn.jsdelivr.net/gh/CauriumX/mihomo-apply@{{RULES_VERSION}}/site/Apple-Site.mrs"
     path: ./ruleset/Apple-Site.mrs
     proxy: DIRECT
-    interval: 600
+    interval: 86400
 
   Bahamut-Site:
     type: http
@@ -616,7 +671,7 @@ rule-providers:
     url: "https://cdn.jsdelivr.net/gh/CauriumX/mihomo-apply@{{RULES_VERSION}}/site/Bahamut-Site.mrs"
     path: ./ruleset/Bahamut-Site.mrs
     proxy: DIRECT
-    interval: 600
+    interval: 86400
 
   Bilibili-Site:
     type: http
@@ -625,7 +680,7 @@ rule-providers:
     url: "https://cdn.jsdelivr.net/gh/CauriumX/mihomo-apply@{{RULES_VERSION}}/site/Bilibili-Site.mrs"
     path: ./ruleset/Bilibili-Site.mrs
     proxy: DIRECT
-    interval: 600
+    interval: 86400
 
   China-IP:
     type: http
@@ -647,7 +702,7 @@ rule-providers:
     url: "https://cdn.jsdelivr.net/gh/CauriumX/mihomo-apply@{{RULES_VERSION}}/site/China-Site.mrs"
     path: ./ruleset/China-Site.mrs
     proxy: DIRECT
-    interval: 600
+    interval: 86400
 
   Crypto:
     type: http
@@ -671,7 +726,7 @@ rule-providers:
     url: "https://cdn.jsdelivr.net/gh/CauriumX/mihomo-apply@{{RULES_VERSION}}/site/Discord-Site.mrs"
     path: ./ruleset/Discord-Site.mrs
     proxy: DIRECT
-    interval: 600
+    interval: 86400
 
   Disney-Site:
     type: http
@@ -680,7 +735,7 @@ rule-providers:
     url: "https://cdn.jsdelivr.net/gh/CauriumX/mihomo-apply@{{RULES_VERSION}}/site/Disney-Site.mrs"
     path: ./ruleset/Disney-Site.mrs
     proxy: DIRECT
-    interval: 600
+    interval: 86400
 
   Google-Site:
     type: http
@@ -689,7 +744,7 @@ rule-providers:
     url: "https://cdn.jsdelivr.net/gh/CauriumX/mihomo-apply@{{RULES_VERSION}}/site/Google-Site.mrs"
     path: ./ruleset/Google-Site.mrs
     proxy: DIRECT
-    interval: 600
+    interval: 86400
 
   Local-IP:
     type: http
@@ -711,7 +766,7 @@ rule-providers:
     url: "https://cdn.jsdelivr.net/gh/CauriumX/mihomo-apply@{{RULES_VERSION}}/site/Meta-Site.mrs"
     path: ./ruleset/Meta-Site.mrs
     proxy: DIRECT
-    interval: 600
+    interval: 86400
 
   Microsoft-Site:
     type: http
@@ -720,7 +775,7 @@ rule-providers:
     url: "https://cdn.jsdelivr.net/gh/CauriumX/mihomo-apply@{{RULES_VERSION}}/site/Microsoft-Site.mrs"
     path: ./ruleset/Microsoft-Site.mrs
     proxy: DIRECT
-    interval: 600
+    interval: 86400
 
   Netflix-Site:
     type: http
@@ -729,7 +784,7 @@ rule-providers:
     url: "https://cdn.jsdelivr.net/gh/CauriumX/mihomo-apply@{{RULES_VERSION}}/site/Netflix-Site.mrs"
     path: ./ruleset/Netflix-Site.mrs
     proxy: DIRECT
-    interval: 600
+    interval: 86400
 
   PayPal:
     type: http
@@ -752,7 +807,7 @@ rule-providers:
     url: "https://cdn.jsdelivr.net/gh/CauriumX/mihomo-apply@{{RULES_VERSION}}/site/Pixiv-Site.mrs"
     path: ./ruleset/Pixiv-Site.mrs
     proxy: DIRECT
-    interval: 600
+    interval: 86400
 
   Reddit-Site:
     type: http
@@ -761,7 +816,7 @@ rule-providers:
     url: "https://cdn.jsdelivr.net/gh/CauriumX/mihomo-apply@{{RULES_VERSION}}/site/Reddit-Site.mrs"
     path: ./ruleset/Reddit-Site.mrs
     proxy: DIRECT
-    interval: 600
+    interval: 86400
 
   Steam-Site:
     type: http
@@ -770,7 +825,7 @@ rule-providers:
     url: "https://cdn.jsdelivr.net/gh/CauriumX/mihomo-apply@{{RULES_VERSION}}/site/Steam-Site.mrs"
     path: ./ruleset/Steam-Site.mrs
     proxy: DIRECT
-    interval: 600
+    interval: 86400
 
   Telegram-IP:
     type: http
@@ -792,7 +847,7 @@ rule-providers:
     url: "https://cdn.jsdelivr.net/gh/CauriumX/mihomo-apply@{{RULES_VERSION}}/site/Telegram-Site.mrs"
     path: ./ruleset/Telegram-Site.mrs
     proxy: DIRECT
-    interval: 600
+    interval: 86400
 
   Twitch-Site:
     type: http
@@ -801,7 +856,7 @@ rule-providers:
     url: "https://cdn.jsdelivr.net/gh/CauriumX/mihomo-apply@{{RULES_VERSION}}/site/Twitch-Site.mrs"
     path: ./ruleset/Twitch-Site.mrs
     proxy: DIRECT
-    interval: 600
+    interval: 86400
 
   Twitter-Site:
     type: http
@@ -810,7 +865,7 @@ rule-providers:
     url: "https://cdn.jsdelivr.net/gh/CauriumX/mihomo-apply@{{RULES_VERSION}}/site/Twitter-Site.mrs"
     path: ./ruleset/Twitter-Site.mrs
     proxy: DIRECT
-    interval: 600
+    interval: 86400
 
 # ============================================================================
 # 规则 —— 与服务商标准配置完全一致，未做任何改动
@@ -895,6 +950,7 @@ rules:
   # <<< PAYPAL-PHISH-INLINE
   # ---------- 服务分流（按 provider 名称字母序） ----------
   - "RULE-SET,AI-Site,🤖AI"
+  - "RULE-SET,IntlAcademic-Site,📖IntlAcademic"
   - "RULE-SET,Adobe-Site,💡Adobe"
   - "RULE-SET,Bahamut-Site,🌸Bahamut"
   - "RULE-SET,Bilibili-Site,📺Bilibili"
@@ -924,7 +980,9 @@ rules:
   - "DOMAIN-KEYWORD,xoom,💳PayPal"
   - "RULE-SET,PayPal,💳PayPal"
   - "RULE-SET,Pixiv-Site,🎨Pixiv"
+  - "RULE-SET,PlayStation-Site,🎮PlayStation"
   - "RULE-SET,Reddit-Site,💬Reddit"
+  - "RULE-SET,Spotify-Site,🎵Spotify"
   - "RULE-SET,Steam-Site,🎮Steam"
   - "RULE-SET,Telegram-Site,✈️Telegram"
   - "RULE-SET,Twitch-Site,📺Twitch"

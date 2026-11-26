@@ -47,8 +47,8 @@ mihomo 模板不是写一次就完的配置文件。它是每个客户端启动�
 
 mihomo 规则体系的模板源：
 
-- **24 个代理组**，全部使用 `include-all-proxies: true`
-- **24 个规则提供者**，每个 URL 携带 `{{RULES_VERSION}}` 而不是活的 ref
+- **27 个代理组**，全部使用 `include-all-proxies: true`
+- **27 个规则提供者**，每个 URL 携带 `{{RULES_VERSION}}` 而不是活的 ref
 - **85 条规则**，顺序保证拦截与订阅更新先执行
 
 订阅域名直连规则只包含对所有使用者都成立的全域名：jsDelivr（本仓库自己的
