@@ -202,7 +202,7 @@ dns:
   #   —— blacklist 模式下它无效且会误导读者。
   #
   #   若确认所有客户端 >= v1.19.19，可改回 rule 并恢复 MATCH,fake-ip 兜底。
-  fake-ip-filter-mode: blacklist
+  fake-ip-filter-mode: rule
   fake-ip-filter:
     - "DOMAIN-SUFFIX,lan,real-ip"
     - "DOMAIN-SUFFIX,local,real-ip"
@@ -232,6 +232,7 @@ dns:
     - "DOMAIN-SUFFIX,88cdn.com,real-ip"
     - "DOMAIN-SUFFIX,p2cdn.com,real-ip"
     - "DOMAIN-SUFFIX,thundercdn.com,real-ip"
+    - "MATCH,fake-ip"
   use-hosts: true
   default-nameserver:
     - "114.114.114.114#DIRECT"
@@ -333,35 +334,6 @@ proxies: []
 #   各组的固定项（Main Proxy / Auto Select / Load Balance / DIRECT / REJECT）仍显式保留。
 # ============================================================================
 proxy-groups:
-  # ==========================================================================
-  # 组结构对齐服务商规范：
-  #   总出口组：♾️Auto Select → ⚖Load Balance → DIRECT → REJECT
-  #   服务组：每个组前置 Main Proxy / Auto Select / Load Balance
-  #   健康检查：https://cp.cloudflare.com，interval 180
-  #
-  # 与服务的差异：节点显式列名时走 getProxies()（parser.go:134），
-  # 按列表顺序输出，不经过 slices.Sort，顺序完全可控。
-  # 代价是节点变更需同步本文件；用 tools/sync-nodes.mjs 从订阅自动刷新。
-  #
-  # 排列约定（仅影响本文件可读性，不影响路由）：
-  #   - 置顶：Main Proxy / Manual Select / China Services（总出口、手动固定与国内分流）
-  #   - 中间：服务组按名称字母序（Adobe → AI → Apple → … → Twitter）
-  #   - 末尾：⚖Load Balance / ♾️Auto Select（被所有服务组引用，放末尾便于阅读）
-  #
-  # 注意：mihomo config/utils.go:23 的 proxyGroupsDagSort 会在加载时做拓扑
-  # 排序，客户端实际显示的组顺序由 DAG 决定，与本文件书写顺序无关。
-  # 路由行为只由下方 rules: 段的匹配顺序决定，与组排列无关。
-  # ==========================================================================
-
-  # Main Proxy 的 proxies[0] 是 select 组刷新后的回落目标（mihomo 默认选中首项）。
-  # 置首为 ✋Manual Select 而非 ♾️Auto Select，原因：
-  #   profile.store-selected 的持久化 key 是「组名 → 节点名」字符串。
-  #   节点名一变（如国旗开关、flagEmojiSeparator 改动、机场改命名），
-  #   key 失效，组回落到 proxies[0]。
-  #   若首项是 ♾️Auto Select，回落即变成自动测速 → IP 乱跳。
-  #   置首为 ✋Manual Select 后，回落只落到手动组，再由手动组自身的
-  #   store-selected 决定，不会主动切到测速组。
-  # 实测（mihomo v1.19.2）：节点集增减不影响选中；节点改名会回落。
   - name: 🌏️Main Proxy
     type: select
     include-all-proxies: true
@@ -473,6 +445,15 @@ proxy-groups:
       - "⚖Load Balance"
       - "REJECT"
 
+  - name: 📖IntlAcademic
+    type: select
+    include-all-proxies: true
+    proxies:
+      - "🌏️Main Proxy"
+      - "♾️Auto Select"
+      - "⚖Load Balance"
+      - "REJECT"
+
   - name: 🪢Meta
     type: select
     include-all-proxies: true
@@ -520,7 +501,25 @@ proxy-groups:
       - "⚖Load Balance"
       - "REJECT"
 
+  - name: 🎮PlayStation
+    type: select
+    include-all-proxies: true
+    proxies:
+      - "🌏️Main Proxy"
+      - "♾️Auto Select"
+      - "⚖Load Balance"
+      - "REJECT"
+
   - name: 💬Reddit
+    type: select
+    include-all-proxies: true
+    proxies:
+      - "🌏️Main Proxy"
+      - "♾️Auto Select"
+      - "⚖Load Balance"
+      - "REJECT"
+
+  - name: 🎵Spotify
     type: select
     include-all-proxies: true
     proxies:
@@ -558,33 +557,6 @@ proxy-groups:
       - "REJECT"
 
   - name: 💬Twitter
-    type: select
-    include-all-proxies: true
-    proxies:
-      - "🌏️Main Proxy"
-      - "♾️Auto Select"
-      - "⚖Load Balance"
-      - "REJECT"
-
-  - name: 📖IntlAcademic
-    type: select
-    include-all-proxies: true
-    proxies:
-      - "🌏️Main Proxy"
-      - "♾️Auto Select"
-      - "⚖Load Balance"
-      - "REJECT"
-
-  - name: 🎮PlayStation
-    type: select
-    include-all-proxies: true
-    proxies:
-      - "🌏️Main Proxy"
-      - "♾️Auto Select"
-      - "⚖Load Balance"
-      - "REJECT"
-
-  - name: 🎵Spotify
     type: select
     include-all-proxies: true
     proxies:
@@ -637,33 +609,6 @@ rule-providers:
     interval: 86400
 
   # --- 新增类目（Sakura 源，2026-11 接入）---
-  IntlAcademic-Site:
-    type: http
-    behavior: domain
-    format: mrs
-    url: "https://cdn.jsdelivr.net/gh/CauriumX/mihomo-apply@{{RULES_VERSION}}/site/IntlAcademic-Site.mrs"
-    path: ./ruleset/IntlAcademic-Site.mrs
-    proxy: DIRECT
-    interval: 86400
-
-  PlayStation-Site:
-    type: http
-    behavior: domain
-    format: mrs
-    url: "https://cdn.jsdelivr.net/gh/CauriumX/mihomo-apply@{{RULES_VERSION}}/site/PlayStation-Site.mrs"
-    path: ./ruleset/PlayStation-Site.mrs
-    proxy: DIRECT
-    interval: 86400
-
-  Spotify-Site:
-    type: http
-    behavior: domain
-    format: mrs
-    url: "https://cdn.jsdelivr.net/gh/CauriumX/mihomo-apply@{{RULES_VERSION}}/site/Spotify-Site.mrs"
-    path: ./ruleset/Spotify-Site.mrs
-    proxy: DIRECT
-    interval: 86400
-
   Apple-Site:
     type: http
     behavior: domain
@@ -691,6 +636,15 @@ rule-providers:
     proxy: DIRECT
     interval: 86400
 
+  China-Site:
+    type: http
+    behavior: domain
+    format: mrs
+    url: "https://cdn.jsdelivr.net/gh/CauriumX/mihomo-apply@{{RULES_VERSION}}/site/China-Site.mrs"
+    path: ./ruleset/China-Site.mrs
+    proxy: DIRECT
+    interval: 86400
+
   China-IP:
     type: http
     behavior: ipcidr
@@ -701,15 +655,6 @@ rule-providers:
     #   url: "https://cdn.jsdelivr.net/gh/CauriumX/mihomo-apply@{{RULES_VERSION}}/site/China-IP.mrs"
     url: "https://cdn.jsdelivr.net/gh/CauriumX/mihomo-apply@{{RULES_VERSION}}/geoip/China-IP.mrs"
     path: ./ruleset/China-IP.mrs
-    proxy: DIRECT
-    interval: 86400
-
-  China-Site:
-    type: http
-    behavior: domain
-    format: mrs
-    url: "https://cdn.jsdelivr.net/gh/CauriumX/mihomo-apply@{{RULES_VERSION}}/site/China-Site.mrs"
-    path: ./ruleset/China-Site.mrs
     proxy: DIRECT
     interval: 86400
 
@@ -752,6 +697,15 @@ rule-providers:
     format: mrs
     url: "https://cdn.jsdelivr.net/gh/CauriumX/mihomo-apply@{{RULES_VERSION}}/site/Google-Site.mrs"
     path: ./ruleset/Google-Site.mrs
+    proxy: DIRECT
+    interval: 86400
+
+  IntlAcademic-Site:
+    type: http
+    behavior: domain
+    format: mrs
+    url: "https://cdn.jsdelivr.net/gh/CauriumX/mihomo-apply@{{RULES_VERSION}}/site/IntlAcademic-Site.mrs"
+    path: ./ruleset/IntlAcademic-Site.mrs
     proxy: DIRECT
     interval: 86400
 
@@ -818,6 +772,15 @@ rule-providers:
     proxy: DIRECT
     interval: 86400
 
+  PlayStation-Site:
+    type: http
+    behavior: domain
+    format: mrs
+    url: "https://cdn.jsdelivr.net/gh/CauriumX/mihomo-apply@{{RULES_VERSION}}/site/PlayStation-Site.mrs"
+    path: ./ruleset/PlayStation-Site.mrs
+    proxy: DIRECT
+    interval: 86400
+
   Reddit-Site:
     type: http
     behavior: domain
@@ -827,12 +790,30 @@ rule-providers:
     proxy: DIRECT
     interval: 86400
 
+  Spotify-Site:
+    type: http
+    behavior: domain
+    format: mrs
+    url: "https://cdn.jsdelivr.net/gh/CauriumX/mihomo-apply@{{RULES_VERSION}}/site/Spotify-Site.mrs"
+    path: ./ruleset/Spotify-Site.mrs
+    proxy: DIRECT
+    interval: 86400
+
   Steam-Site:
     type: http
     behavior: domain
     format: mrs
     url: "https://cdn.jsdelivr.net/gh/CauriumX/mihomo-apply@{{RULES_VERSION}}/site/Steam-Site.mrs"
     path: ./ruleset/Steam-Site.mrs
+    proxy: DIRECT
+    interval: 86400
+
+  Telegram-Site:
+    type: http
+    behavior: domain
+    format: mrs
+    url: "https://cdn.jsdelivr.net/gh/CauriumX/mihomo-apply@{{RULES_VERSION}}/site/Telegram-Site.mrs"
+    path: ./ruleset/Telegram-Site.mrs
     proxy: DIRECT
     interval: 86400
 
@@ -846,15 +827,6 @@ rule-providers:
     #   url: "https://cdn.jsdelivr.net/gh/CauriumX/mihomo-apply@{{RULES_VERSION}}/site/Telegram-IP.mrs"
     url: "https://cdn.jsdelivr.net/gh/CauriumX/mihomo-apply@{{RULES_VERSION}}/geoip/Telegram-IP.mrs"
     path: ./ruleset/Telegram-IP.mrs
-    proxy: DIRECT
-    interval: 86400
-
-  Telegram-Site:
-    type: http
-    behavior: domain
-    format: mrs
-    url: "https://cdn.jsdelivr.net/gh/CauriumX/mihomo-apply@{{RULES_VERSION}}/site/Telegram-Site.mrs"
-    path: ./ruleset/Telegram-Site.mrs
     proxy: DIRECT
     interval: 86400
 
