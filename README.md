@@ -51,8 +51,8 @@ breakage detectable before it ships.
 
 The template source for the mihomo rules pipeline:
 
-- **24 proxy groups**, all using `include-all-proxies: true`
-- **24 rule-providers**, every URL carrying `{{RULES_VERSION}}` instead of a live ref
+- **27 proxy groups**, all using `include-all-proxies: true`
+- **27 rule-providers**, every URL carrying `{{RULES_VERSION}}` instead of a live ref
 - **85 rules**, ordered so that rejects and subscription updates run first
 
 It does not publish. Rendering and release happen in
